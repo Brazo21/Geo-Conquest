@@ -1,8 +1,53 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@{
+    ViewData["Title"] = "Welcome";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="row justify-content-center py-lg-4">
+    <div class="col-xl-10">
+        <div class="cr-panel cr-glow p-4 p-md-5">
+            <div class="row g-4 align-items-center">
+                <div class="col-lg-7">
+                    <div class="cr-label"><span>Incoming transmission · classified</span></div>
+                    <h1 class="cr-title mb-3" style="font-size:2.2rem;line-height:1.2">GeoConquest<br />Command Room</h1>
+                    <p class="cr-readout mb-4" style="font-size:1.05rem">
+                        Ten nations. Nine rival commanders.<br />
+                        One world to conquer.<br />
+                        Ready, Commander? <span class="cr-cursor"></span>
+                    </p>
+                    <p class="mb-4" style="max-width:34rem">
+                        Pick your country, roll the dice and outwit computer generals who explain every move,
+                        while a live AI commentator calls each battle.
+                    </p>
+                    <div class="d-flex flex-wrap gap-3">
+                        <a class="cr-btn green lg" asp-controller="Account" asp-action="Register">Sign up · it's free</a>
+                        <a class="cr-btn lg" asp-controller="Account" asp-action="Login">Log in</a>
+                    </div>
+                    <p class="cr-sub mt-4 mb-0">
+                        Just want to watch?
+                        <a asp-controller="Games" asp-action="Index" asp-route-scope="live">Browse live games</a>.
+                        No account needed.
+                    </p>
+                </div>
+
+                <div class="col-lg-5">
+                    <div class="cr-screen p-3">
+                        <div class="cr-label"><span>Situation report</span></div>
+                        <div class="cr-cards">
+                            <div class="cr-card" style="--pc:var(--cr-red)"><div class="head"><span>NPC · Red</span><span class="tag">AGG</span></div>3 countries<br />22 soldiers<div class="state">Placing +6</div></div>
+                            <div class="cr-card" style="--pc:var(--cr-blue)"><div class="head"><span>NPC · Blue</span><span class="tag">DEF</span></div>2 countries<br />15 soldiers<div class="state">Idle</div></div>
+                            <div class="cr-card" style="--pc:var(--cr-purple)"><div class="head"><span>NPC · Purple</span><span class="tag">OPP</span></div>2 countries<br />5 soldiers<div class="state">Waiting</div></div>
+                            <div class="cr-card current" style="--pc:var(--cr-green)"><div class="head"><span>You · Green</span><span class="tag">YOU</span></div>1 country<br />9 soldiers<div class="state">Your turn</div></div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mt-3">
+                            <span class="cr-die" style="color:var(--cr-green)"><span>6</span></span>
+                            <span class="cr-muted small">vs</span>
+                            <span class="cr-die" style="color:var(--cr-red)"><span>2</span></span>
+                            <span class="small cr-upper ms-2 cr-green">You win the duel</span>
+                        </div>
+                        <p class="cr-tape mt-3 mb-0" style="font-size:.8rem">“A six crushes a two. The aggressor smells blood.”<span class="src">Live AI commentary</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

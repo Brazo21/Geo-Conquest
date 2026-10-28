@@ -1,0 +1,17 @@
+@model PlayGameViewModel
+@* Every country and its soldiers, always visible (brief requirement). Updated live by game-feed.js. *@
+<div class="cr-panel">
+    <div class="cr-label"><span>Theatre ledger · all 10 countries</span></div>
+    <table class="cr-table" style="font-size:.74rem">
+        <tbody id="ledger">
+            @foreach (var c in Model.Countries)
+            {
+                <tr data-code="@c.Code" class="@(c.IsMine ? "mine" : "")">
+                    <td>@c.Name</td>
+                    <td class="owner"><span class="cr-swatch" style="background:@c.Color"></span><span class="nm">@(c.IsMine ? "You" : c.OwnerName.Split(" · ")[0])</span></td>
+                    <td class="soldiers text-end fw-bold">@c.Soldiers</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

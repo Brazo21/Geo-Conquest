@@ -1,0 +1,590 @@
+@model PlayGameViewModel
+@{
+    ViewData["Title"] = $"Game #{Model.ShortId}";
+    var shareUrl = $"{Context.Request.Scheme}://{Context.Request.Host}/game/{Model.GameId}";
+    var inProgress = Model.Status == GameStatus.InProgress;
+    var human = Model.Human;
+    var playersById = Model.Players.ToDictionary(p => p.Id);
+    var mapById = Model.MapPoints.ToDictionary(p => p.Code);
+
+    string Tag(PlayerRow p) => p.IsHuman ? "YOU" : p.Profile switch
+    {
+        NpcProfile.Aggressor => "AGG",
+        NpcProfile.Defender => "DEF",
+        NpcProfile.Opportunist => "OPP",
+        _ => "NPC"
+    };
+
+    string State(PlayerRow p) =>
+        p.IsEliminated ? "Eliminated" :
+        p.IsCurrent ? (p.IsHuman ? "Your turn" : "Moving") :
+        "Waiting";
+
+    // Data for the map, live feed and odds scripts.
+    var clientState = new
+    {
+        gameId = Model.GameId,
+        replayFrom = Model.ReplayFrom,
+        lastSequence = Model.LastEventSequence,
+        isSpectator = Model.IsSpectator,
+        isOwner = Model.IsOwner,
+        canAct = Model.CanAct,
+        inProgress,
+        humanId = human.Id,
+        battle = Model.Battle is null ? null : new { from = Model.Battle.Attacker.Code, to = Model.Battle.Defender.Code },
+        players = Model.Players.Select(p => new { id = p.Id, name = p.Name, color = p.Color, isHuman = p.IsHuman, tag = Tag(p) }),
+        countries = Model.Countries.Select(c => new
+        {
+            code = c.Code,
+            name = c.Name,
+            ownerId = c.OwnerId,
+            soldiers = c.Soldiers,
+            value = c.SoldierValue,
+            mapId = mapById.TryGetValue(c.Code, out var m) ? m.MapId : null,
+            lat = mapById.TryGetValue(c.Code, out var m2) ? m2.Lat : 0,
+            lon = mapById.TryGetValue(c.Code, out var m3) ? m3.Lon : 0
+        })
+    };
+}
+
+@section Head {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js" defer></script>
+}
+
+@* ═════════════════════════ Header strip ═════════════════════════ *@
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">@(Model.Battle is null ? "Command Room" : "Engagement Terminal")</h1>
+        <div class="cr-sub cr-upper">
+            Game #@Model.ShortId · Commander @Model.CommanderName ·
+            @if (Model.IsSpectator)
+            {
+                <span class="cr-red"><span class="cr-dot live"></span>Spectating live</span>
+            }
+            else if (Model.CanAct)
+            {
+                <span class="cr-green">Your turn</span>
+            }
+            else
+            {
+                <span>@(inProgress ? "Standing by" : "Game over")</span>
+            }
+        </div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="cr-sub cr-upper d-none d-md-inline">Share link</span>
+        <input class="cr-input form-control form-control-sm" style="width:20rem;max-width:70vw" value="@shareUrl" readonly
+               onclick="this.select()" aria-label="Share link so others can watch live" />
+    </div>
+</div>
+
+@if (Model.Battle is { } battle)
+{
+    @* ═════════════════════════ ENGAGEMENT TERMINAL ═════════════════════════ *@
+    var attackerOwner = playersById[battle.Attacker.OwnerId];
+    var defenderOwner = playersById[battle.Defender.OwnerId];
+    var rolls = Model.CurrentBattleEvents.Where(e => e.Type == GameEventType.DiceRolled).ToList();
+    var lastRoll = rolls.LastOrDefault();
+    int attackerLost = lastRoll is null ? 0 : lastRoll.AttackerDice.Zip(lastRoll.DefenderDice).Count(p => p.Second > p.First);
+    int defenderLost = lastRoll is null ? 0 : lastRoll.AttackerDice.Zip(lastRoll.DefenderDice).Count(p => p.First > p.Second);
+    int nextDice = Math.Min(battle.Attacker.Soldiers - 1, battle.Defender.Soldiers);
+    var battleCommentary = Model.CurrentBattleEvents.LastOrDefault(e => e.Commentary is not null);
+
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="cr-panel">
+                <div class="cr-label"><span>Engagement terminal · Round @Model.Round · Roll @rolls.Count</span><span class="hint">all 10 countries in the ledger →</span></div>
+                <div class="cr-screen p-3 p-md-4">
+                    <h2 class="text-center cr-upper mb-4" style="font-size:1.25rem;letter-spacing:.12em">
+                        <span style="color:@attackerOwner.Color">@attackerOwner.Name</span>
+                        <span class="cr-amber">attacks</span>
+                        <span style="color:@defenderOwner.Color">@battle.Defender.Name</span>
+                    </h2>
+
+                    <div class="row g-3 align-items-center mb-4">
+                        <div class="col">
+                            <div class="cr-fighter" style="--pc:@attackerOwner.Color">
+                                <div class="who">Attacker · @battle.Attacker.Name</div>
+                                <div class="d-flex align-items-end gap-3">
+                                    <span class="big">@battle.Attacker.Soldiers</span>
+                                    @if (lastRoll is not null)
+                                    {
+                                        <span class="delta">−@attackerLost this roll</span>
+                                    }
+                                </div>
+                                <div class="small cr-muted cr-upper">@(battle.Attacker.Soldiers - 1) can fight · 1 stays home</div>
+                                <div class="cr-pips">
+                                    @for (int i = 0; i < Math.Min(battle.Attacker.Soldiers + attackerLost, 24); i++)
+                                    {
+                                        <i class="@(i < battle.Attacker.Soldiers ? "on" : "")"></i>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-auto cr-amber fw-bold" style="font-size:1.5rem">VS</div>
+                        <div class="col">
+                            <div class="cr-fighter" style="--pc:@defenderOwner.Color">
+                                <div class="who">Defender · @battle.Defender.Name · @defenderOwner.Name</div>
+                                <div class="d-flex align-items-end gap-3">
+                                    <span class="big">@battle.Defender.Soldiers</span>
+                                    @if (lastRoll is not null)
+                                    {
+                                        <span class="delta">−@defenderLost this roll</span>
+                                    }
+                                </div>
+                                <div class="small cr-muted cr-upper">@nextDice dice next roll</div>
+                                <div class="cr-pips">
+                                    @for (int i = 0; i < Math.Min(battle.Defender.Soldiers + defenderLost, 24); i++)
+                                    {
+                                        <i class="@(i < battle.Defender.Soldiers ? "on" : "")"></i>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (lastRoll is not null)
+                    {
+                        for (int i = 0; i < lastRoll.AttackerDice.Count; i++)
+                        {
+                            int a = lastRoll.AttackerDice[i], d = lastRoll.DefenderDice[i];
+                            string verdict = a > d ? $"{attackerOwner.Name} wins: {battle.Defender.Name} −1"
+                                           : d > a ? $"{defenderOwner.Name} wins: {battle.Attacker.Name} −1"
+                                           : "Tie: nobody falls";
+                            <div class="cr-duel">
+                                <span class="cr-die @(a > d ? "won" : "") @(Model.IsReplaying ? "roll" : "")" style="color:@attackerOwner.Color"><span>@a</span></span>
+                                <span class="verdict" style="color:@(a > d ? attackerOwner.Color : d > a ? defenderOwner.Color : "var(--cr-muted)")">@verdict</span>
+                                <span class="cr-die @(d > a ? "won" : "") @(Model.IsReplaying ? "roll" : "")" style="color:@defenderOwner.Color"><span>@d</span></span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-center cr-muted cr-upper my-4">Dice ready · @nextDice duel(s) on the first roll</p>
+                    }
+
+                    <div class="d-flex align-items-center gap-3 mt-3 cr-upper small">
+                        <span>Odds <strong class="@(battle.Odds >= .5 ? "cr-green" : "cr-red")">@battle.Odds.ToString("P0")</strong></span>
+                        <div class="cr-progress flex-grow-1"><div style="width:@((int)Math.Round(battle.Odds * 100))%"></div></div>
+                        <span>Spoils <strong class="cr-green">+@Math.Max(2, battle.Defender.SoldierValue / 2)</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cr-console mt-3">
+                <div class="cr-label"><span>Controls · owner only</span>
+                    <span class="cr-speed btn-group" role="group" aria-label="Playback speed">
+                        <button type="button" class="cr-btn sm" data-speed="1">1×</button>
+                        <button type="button" class="cr-btn sm" data-speed="2">2×</button>
+                        <button type="button" class="cr-btn sm" data-speed="4">4×</button>
+                    </span>
+                </div>
+                <div id="replay-wait" class="cr-upper small text-center py-2 @(Model.IsReplaying ? "" : "d-none")" style="color:#f3ead2">
+                    <span class="cr-dot live"></span>Rolling…
+                </div>
+                <div id="after-replay" class="@(Model.IsReplaying ? "d-none" : "")">
+                    @if (Model.CanAct)
+                    {
+                        <div class="row g-3 align-items-center">
+                            <div class="col-auto text-center">
+                                <div class="cr-led"></div>
+                                <div class="small cr-upper mt-1" style="color:#ece4cc;font-size:.62rem">Dice ready</div>
+                            </div>
+                            <div class="col">
+                                <form asp-action="Roll" asp-route-id="@Model.GameId" method="post">
+                                    <button type="submit" class="cr-btn red lg w-100">@(rolls.Count == 0 ? "Roll the dice" : "Roll again")</button>
+                                </form>
+                            </div>
+                            <div class="col-sm-auto">
+                                <form asp-action="Retreat" asp-route-id="@Model.GameId" method="post">
+                                    <button type="submit" class="cr-btn w-100">Retreat · End turn</button>
+                                </form>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="cr-label mb-1"><span>Attack ends when</span></div>
+                                <div class="cr-screen small cr-amber cr-upper py-2 px-2" style="border-radius:4px;font-size:.7rem">
+                                    @battle.Defender.Name = 0<br />or you = 1<br />or retreat
+                                </div>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="cr-upper small text-center mb-0 py-2" style="color:#ece4cc">Spectating · visitors see the dice live, no buttons</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="cr-panel cr-glow">
+                <div class="cr-label"><span>Battle log</span></div>
+                <div class="cr-log" id="event-log" style="max-height:15rem">
+                    @foreach (var e in Model.CurrentBattleEvents)
+                    {
+                        <div class="entry" style="border-color:@e.Color">
+                            <div class="msg">@e.Message</div>
+                            @if (e.AttackerDice.Count > 0)
+                            {
+                                <div class="dice">@string.Join(" ", e.AttackerDice) vs @string.Join(" ", e.DefenderDice)</div>
+                            }
+                        </div>
+                    }
+                    <div class="cr-amber">› Awaiting orders<span class="cr-cursor ms-1"></span></div>
+                </div>
+            </div>
+
+            <div class="cr-panel cr-glow">
+                <div class="cr-label"><span>AI commentary tape · voice: sports</span></div>
+                <div class="cr-tape" id="commentary-tape">
+                    @if (battleCommentary is not null)
+                    {
+                        <span>“@battleCommentary.Commentary”</span>
+                        <span class="src">@(battleCommentary.CommentaryIsAi ? "Generated by an LLM after every roll" : "Built-in line · AI was busy")</span>
+                    }
+                    else
+                    {
+                        <span class="cr-muted">The commentator is waiting for the first roll…</span>
+                    }
+                </div>
+            </div>
+
+            <div class="cr-panel">
+                <div class="cr-label"><span>Spectator feed</span></div>
+                <div class="small cr-upper">
+                    <div><span class="cr-dot live"></span>Live for anyone with the link</div>
+                    <div class="cr-muted">Visitors see dice live, no buttons.</div>
+                    <div class="cr-muted">/game/@Model.ShortId…</div>
+                </div>
+            </div>
+
+            <partial name="_Ledger" model="Model" />
+        </div>
+    </div>
+}
+else
+{
+    @* ═════════════════════════ COMMAND ROOM (map) ═════════════════════════ *@
+    <div class="row g-3">
+        @* ───── Left: commander, event log, last roll ───── *@
+        <div class="col-xl-3 col-lg-4 order-2 order-lg-1">
+            <div class="cr-panel">
+                <div class="cr-label"><span style="color:@human.Color">Commander [@human.Name]</span></div>
+                <div class="cr-readout" id="readout">
+                    Control: <span data-readout="countries">@human.Countries</span> countr@(human.Countries == 1 ? "y" : "ies").<br />
+                    Soldiers: <span data-readout="soldiers">@human.Soldiers</span>.<br />
+                    @if (Model.CanAct && Model.PendingReinforcements > 0)
+                    {
+                        <span>Reinforcements: +@Model.PendingReinforcements.</span><br />
+                    }
+                    @if (!inProgress)
+                    {
+                        <span>@(Model.OutcomeMessage)</span>
+                    }
+                    else if (Model.IsSpectator)
+                    {
+                        <span>Mode: spectator.</span>
+                    }
+                    else
+                    {
+                        <span>Next action? <span class="cr-cursor"></span></span>
+                    }
+                </div>
+            </div>
+
+            <div class="cr-panel">
+                <div class="cr-label"><span>Event log</span><span class="hint">newest first</span></div>
+                <div class="cr-log" id="event-log">
+                    @foreach (var e in Model.Events.Where(e => Model.ReplayFrom is null || e.Sequence <= Model.ReplayFrom))
+                    {
+                        <div class="entry" style="border-color:@e.Color">
+                            <div class="round">R@(e.Round)</div>
+                            <div class="msg">@e.Message</div>
+                            @if (e.AttackerDice.Count > 0)
+                            {
+                                <div class="dice">@string.Join(" ", e.AttackerDice) vs @string.Join(" ", e.DefenderDice)</div>
+                            }
+                            @if (e.Commentary is not null)
+                            {
+                                <div class="mic">🎙 @e.Commentary</div>
+                            }
+                            @if (e.Reasoning is not null)
+                            {
+                                <div class="why">Why: @e.Reasoning</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="cr-panel">
+                <div class="cr-label"><span>Last roll</span></div>
+                <div id="last-roll">
+                    @if (Model.LastRoll is { } lr && !Model.IsReplaying)
+                    {
+                        for (int i = 0; i < lr.AttackerDice.Count && i < 4; i++)
+                        {
+                            int a = lr.AttackerDice[i], d = lr.DefenderDice[i];
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="cr-die sm @(a > d ? "won" : "")" style="color:@lr.Color"><span>@a</span></span>
+                                <span class="cr-muted small">vs</span>
+                                <span class="cr-die sm @(d > a ? "won" : "")" style="color:var(--cr-red)"><span>@d</span></span>
+                                <span class="small cr-upper ms-1">@(a > d ? "Attacker wins" : d > a ? "Defender wins" : "Tie")</span>
+                            </div>
+                        }
+                        <div class="small cr-muted mt-1">@lr.Message</div>
+                    }
+                    else
+                    {
+                        <div class="small cr-muted">No dice rolled yet.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ───── Centre: map, status, controls ───── *@
+        <div class="col-xl-6 col-lg-8 order-1 order-lg-2">
+            <div class="cr-panel">
+                <div class="cr-label"><span>The world · all 10 countries visible</span><span class="hint">@(Model.CanAct ? "click a pin to pick a target" : "pins show soldiers")</span></div>
+                <div class="cr-screen">
+                    <div class="cr-map" id="world-map" role="img" aria-label="World map showing the 10 countries in this game, their owners and soldiers"></div>
+                </div>
+                <div class="cr-map-legend" id="map-legend">
+                    @foreach (var p in Model.Players.Where(p => !p.IsEliminated))
+                    {
+                        <span><span class="cr-swatch" style="background:@p.Color"></span>@(p.IsHuman ? "You" : p.Name)</span>
+                    }
+                </div>
+            </div>
+
+            <div class="cr-statusbar mt-3">
+                <span><span class="cr-dot @(Model.CanAct ? "on" : "")" id="dot-player"></span>Player turn</span>
+                <span><span class="cr-dot @(Model.IsReplaying ? "live" : "")" id="dot-sim"></span><span id="sim-status">NPC simulation @(Model.IsReplaying ? "active" : "idle")</span></span>
+                <span id="round-label">Round @Model.Round</span>
+            </div>
+
+            <div id="banner" class="cr-banner mt-3 d-none"></div>
+
+            <div id="after-replay-banner" class="@(Model.IsReplaying ? "d-none" : "")">
+                @if (Model.OutcomeMessage is not null)
+                {
+                    <div class="cr-banner mt-3 @(Model.Status == GameStatus.Completed && Model.OutcomeMessage.StartsWith("Victory") ? "" : "bad")">@Model.OutcomeMessage</div>
+                }
+            </div>
+
+            <div class="cr-console mt-3">
+                <div class="cr-label">
+                    <span>Controls · logged-in owner only</span>
+                    <span class="d-flex align-items-center gap-2">
+                        <span style="font-size:.62rem">Fast-forward</span>
+                        <span class="cr-speed btn-group" role="group" aria-label="Playback speed">
+                            <button type="button" class="cr-btn sm" data-speed="1">1×</button>
+                            <button type="button" class="cr-btn sm" data-speed="2">2×</button>
+                            <button type="button" class="cr-btn sm" data-speed="4">4×</button>
+                        </span>
+                    </span>
+                </div>
+
+                <div id="replay-wait" class="cr-upper small text-center py-3 @(Model.IsReplaying ? "" : "d-none")" style="color:#f3ead2">
+                    <span class="cr-dot live"></span>NPC simulation active · every move is shown · your orders unlock when it catches up
+                </div>
+
+                <div id="after-replay" class="@(Model.IsReplaying ? "d-none" : "")">
+                    @if (Model.CanAct && Model.Phase == TurnPhase.Reinforcement)
+                    {
+                        <form asp-action="Reinforce" asp-route-id="@Model.GameId" method="post" class="row g-2 align-items-end">
+                            <div class="col-sm-5">
+                                <label class="form-label" for="r-country">Place on</label>
+                                <select id="r-country" name="CountryCode" class="form-select" required>
+                                    @foreach (var c in Model.MyCountries)
+                                    {
+                                        <option value="@c.Code">@c.Name (@c.Soldiers)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-sm-3">
+                                <label class="form-label" for="r-amount">Soldiers</label>
+                                <input id="r-amount" name="Amount" type="number" class="form-control" min="1"
+                                       max="@Model.PendingReinforcements" value="@Model.PendingReinforcements" required />
+                            </div>
+                            <div class="col-sm-4">
+                                <button type="submit" class="cr-btn green w-100">Place +@Model.PendingReinforcements</button>
+                            </div>
+                        </form>
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <button type="button" class="cr-btn red" disabled>Attack</button>
+                            <button type="button" class="cr-btn" disabled>Transfer</button>
+                            <button type="button" class="cr-btn" disabled>Skip turn</button>
+                        </div>
+                        <p class="small cr-upper mt-2 mb-0" style="color:#ece4cc">Place all reinforcements to unlock your orders.</p>
+                    }
+                    else if (Model.CanAct && Model.Phase == TurnPhase.Action)
+                    {
+                        bool canAttack = !Model.AttackUsedThisTurn && Model.AttackSources.Any();
+                        <div class="row g-3 align-items-stretch">
+                            <div class="col-md-5">
+                                <div class="d-grid gap-2" style="grid-template-columns:1fr 1fr">
+                                    <button type="submit" form="attack-form" class="cr-btn red" id="attack-btn" disabled="@(canAttack ? null : "disabled")">Attack</button>
+                                    <form asp-action="EndTurn" asp-route-id="@Model.GameId" method="post" class="d-grid">
+                                        <button type="submit" class="cr-btn">@(Model.AttackUsedThisTurn ? "End turn" : "Skip turn")</button>
+                                    </form>
+                                    <button type="button" class="cr-btn" data-bs-toggle="collapse" data-bs-target="#transfer-box"
+                                            aria-expanded="false" aria-controls="transfer-box" disabled="@(Model.MyCountries.Count() >= 2 ? null : "disabled")">Transfer</button>
+                                    <button type="button" class="cr-btn green" disabled>Place +0</button>
+                                </div>
+                                @if (Model.AttackUsedThisTurn)
+                                {
+                                    <p class="small cr-upper mt-2 mb-0" style="color:#ece4cc;font-size:.66rem">Attack used this turn · move soldiers or end turn</p>
+                                }
+                            </div>
+
+                            <div class="col-md-4">
+                                <form asp-action="Attack" asp-route-id="@Model.GameId" method="post" id="attack-form">
+                                    <label class="form-label mb-1" for="a-from">From</label>
+                                    <select id="a-from" name="FromCode" class="form-select form-select-sm mb-2" disabled="@(canAttack ? null : "disabled")">
+                                        @foreach (var c in Model.AttackSources.OrderByDescending(c => c.Soldiers))
+                                        {
+                                            <option value="@c.Code" data-soldiers="@c.Soldiers">@c.Name (@c.Soldiers)</option>
+                                        }
+                                    </select>
+                                    <label class="form-label mb-1" for="a-to">Target</label>
+                                    <select id="a-to" name="ToCode" class="form-select form-select-sm" disabled="@(canAttack ? null : "disabled")">
+                                        @foreach (var c in Model.EnemyCountries.OrderBy(c => c.Soldiers))
+                                        {
+                                            <option value="@c.Code" data-soldiers="@c.Soldiers" data-value="@c.SoldierValue">@c.Name (@c.Soldiers) · @c.OwnerName</option>
+                                        }
+                                    </select>
+                                </form>
+                            </div>
+
+                            <div class="col-md-3 text-center">
+                                <div class="cr-dial mb-2" id="odds-dial" aria-hidden="true"></div>
+                                <div class="form-label mb-0">Win odds</div>
+                                <div class="cr-odds" id="odds-value">—</div>
+                                <div class="small cr-upper" style="color:#ece4cc;font-size:.66rem">Spoils <span id="odds-spoils">+0</span></div>
+                            </div>
+                        </div>
+
+                        <div class="collapse mt-3" id="transfer-box">
+                            <form asp-action="Transfer" asp-route-id="@Model.GameId" method="post" class="row g-2 align-items-end">
+                                <div class="col-sm-4">
+                                    <label class="form-label" for="t-from">Move from</label>
+                                    <select id="t-from" name="FromCode" class="form-select" required>
+                                        @foreach (var c in Model.MyCountries.Where(c => c.Soldiers > 1))
+                                        {
+                                            <option value="@c.Code">@c.Name (@c.Soldiers)</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="form-label" for="t-to">To</label>
+                                    <select id="t-to" name="ToCode" class="form-select" required>
+                                        @foreach (var c in Model.MyCountries)
+                                        {
+                                            <option value="@c.Code">@c.Name (@c.Soldiers)</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-sm-2">
+                                    <label class="form-label" for="t-amount">Soldiers</label>
+                                    <input id="t-amount" name="Amount" type="number" class="form-control" min="1" value="1" required />
+                                </div>
+                                <div class="col-sm-2">
+                                    <button type="submit" class="cr-btn green w-100">Move</button>
+                                </div>
+                            </form>
+                            <p class="small cr-upper mt-2 mb-0" style="color:#ece4cc;font-size:.66rem">Every country keeps at least 1 soldier.</p>
+                        </div>
+                    }
+                    else if (Model.IsOwner && inProgress)
+                    {
+                        <p class="small cr-upper text-center mb-0 py-2" style="color:#ece4cc">Standing by · @Model.CurrentPlayerName is moving</p>
+                    }
+                    else if (Model.IsSpectator && inProgress)
+                    {
+                        <p class="small cr-upper text-center mb-0 py-2" style="color:#ece4cc">
+                            Spectator mode · you can watch but not play ·
+                            <a asp-controller="Account" asp-action="Register" style="color:var(--cr-green)">Sign up</a> or
+                            <a asp-controller="Account" asp-action="Login" asp-route-returnUrl="@Context.Request.Path" style="color:var(--cr-amber-hi)">log in</a>
+                            to start your own campaign
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="text-center py-2">
+                            <a class="cr-btn green" asp-action="New">Start a new campaign</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ───── Right: NPC cards, decisions, standings, ledger ───── *@
+        <div class="col-xl-3 col-lg-12 order-3">
+            <div class="cr-cards">
+                @foreach (var p in Model.Players)
+                {
+                    <div class="cr-card @(p.IsCurrent ? "current" : "") @(p.IsEliminated ? "out" : "")" style="--pc:@p.Color" data-player="@p.Id">
+                        <div class="head"><span class="nm">@(p.IsHuman ? "You" : p.Name)</span><span class="tag">@Tag(p)</span></div>
+                        <div><span data-f="countries">@p.Countries</span> countr@(p.Countries == 1 ? "y" : "ies")</div>
+                        <div><span data-f="soldiers">@p.Soldiers</span> soldiers</div>
+                        <div class="state" data-f="state">@State(p)</div>
+                    </div>
+                }
+            </div>
+
+            <div class="cr-panel mt-3">
+                <div class="cr-label"><span>NPC decisions</span><span class="hint">stay visible during fast-forward</span></div>
+                <div class="cr-decisions" id="npc-decisions">
+                    @foreach (var d in Model.RecentDecisions.Where(e => Model.ReplayFrom is null || e.Sequence <= Model.ReplayFrom))
+                    {
+                        <div class="d">
+                            <div class="who" style="color:@d.Color">@d.Message</div>
+                            <div class="why">Why: @d.Reasoning</div>
+                        </div>
+                    }
+                    @if (!Model.RecentDecisions.Any())
+                    {
+                        <div class="cr-muted small">NPC reasoning appears here as they move.</div>
+                    }
+                </div>
+                <div class="cr-label mt-3"><span>AI commentary</span></div>
+                <div class="cr-tape" id="commentary-tape" style="font-size:.78rem">
+                    @if (Model.LatestCommentary is { } lc && !Model.IsReplaying)
+                    {
+                        <span>“@lc.Commentary”</span>
+                        <span class="src">@(lc.CommentaryIsAi ? "Generated by an LLM" : "Built-in line · AI was busy")</span>
+                    }
+                    else
+                    {
+                        <span class="cr-muted">Waiting for the first battle…</span>
+                    }
+                </div>
+            </div>
+
+            <div class="cr-panel">
+                <div class="cr-label"><span>World standings · soldiers</span></div>
+                <div class="cr-bars" id="standings">
+                    @foreach (var p in Model.Players.OrderByDescending(p => p.Soldiers))
+                    {
+                        <div class="row-bar" style="--pc:@p.Color" data-standing="@p.Id">
+                            <span class="nm">@(p.IsHuman ? "You" : p.Name.Split(" · ")[0])</span>
+                            <div class="track"><div class="fill" style="width:@(p.Soldiers * 100 / Model.MaxPlayerSoldiers)%"></div></div>
+                            <span class="val">@p.Soldiers</span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <partial name="_Ledger" model="Model" />
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>window.geoConquest = @Json.Serialize(clientState);</script>
+    <script src="~/js/battle-odds.js" asp-append-version="true"></script>
+    <script src="~/js/game-map.js" asp-append-version="true"></script>
+    <script src="~/js/game-feed.js" asp-append-version="true"></script>
+}

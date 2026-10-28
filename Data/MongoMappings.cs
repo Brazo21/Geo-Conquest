@@ -33,10 +33,17 @@ public static class MongoMappings
         // Private setters and private parameterless constructors are populated by the driver via reflection.
         BsonClassMap.TryRegisterClassMap<Country>(cm => cm.AutoMap());
         BsonClassMap.TryRegisterClassMap<Player>(cm => cm.AutoMap());
+        BsonClassMap.TryRegisterClassMap<UserAccount>(cm =>
+        {
+            cm.AutoMap();
+            cm.MapIdMember(u => u.Id);
+        });
 
         BsonClassMap.TryRegisterClassMap<GameEvent>(cm =>
         {
             cm.AutoMap();
+            cm.UnmapMember(e => e.HasCommentary);
+            cm.UnmapMember(e => e.IsBattleEvent);
             cm.UnmapMember(e => e.AttackerDice);
             cm.UnmapMember(e => e.DefenderDice);
             cm.MapField("_attackerDice").SetElementName("attackerDice");

@@ -12,9 +12,8 @@ public sealed class MongoDbSettings
     public const string SectionName = "MongoDb";
 
     [Required(ErrorMessage =
-        "MongoDb:ConnectionString is missing. Set it with: " +
-        "dotnet user-secrets set \"MongoDb:ConnectionString\" \"mongodb+srv://...\" " +
-        "or the environment variable MongoDb__ConnectionString.")]
+        "MongoDb:ConnectionString is missing. In Visual Studio right-click the project > Manage User Secrets " +
+        "and add it there, or set the environment variable MongoDb__ConnectionString.")]
     [RegularExpression(@"^mongodb(\+srv)?://.+",
         ErrorMessage = "MongoDb:ConnectionString must start with mongodb:// or mongodb+srv://.")]
     public string ConnectionString { get; init; } = string.Empty;
@@ -26,4 +25,8 @@ public sealed class MongoDbSettings
     [Required]
     [MinLength(1)]
     public string GamesCollectionName { get; init; } = "games";
+
+    [Required]
+    [MinLength(1)]
+    public string UsersCollectionName { get; init; } = "users";
 }

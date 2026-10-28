@@ -1,0 +1,55 @@
+@model RegisterViewModel
+@{
+    ViewData["Title"] = "Sign up";
+}
+
+<div class="row justify-content-center py-lg-4">
+    <div class="col-md-10 col-lg-7">
+        <div class="cr-panel cr-glow p-4">
+            <div class="cr-label"><span>Enlistment form</span></div>
+            <h1 class="cr-title mb-1">Enlist as a Commander</h1>
+            <p class="cr-sub mb-4">Playing needs a free account. Watching does not.</p>
+
+            <form asp-action="Register" method="post" novalidate>
+                <div asp-validation-summary="ModelOnly" class="mb-3"></div>
+
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <label asp-for="Username" class="form-label"></label>
+                        <input asp-for="Username" class="form-control" autocomplete="username" autofocus />
+                        <span asp-validation-for="Username" class="small"></span>
+                    </div>
+                    <div class="col-sm-6">
+                        <label asp-for="DisplayName" class="form-label"></label>
+                        <input asp-for="DisplayName" class="form-control" placeholder="Shown on the board" />
+                        <span asp-validation-for="DisplayName" class="small"></span>
+                    </div>
+                    <div class="col-12">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" autocomplete="email" />
+                        <span asp-validation-for="Email" class="small"></span>
+                    </div>
+                    <div class="col-sm-6">
+                        <label asp-for="Password" class="form-label"></label>
+                        <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="Password" class="small"></span>
+                        <div class="cr-sub mt-1">At least 8 characters, with a letter and a number.</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label asp-for="ConfirmPassword" class="form-label"></label>
+                        <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="ConfirmPassword" class="small"></span>
+                    </div>
+                </div>
+
+                <button type="submit" class="cr-btn green w-100 mt-4">Create account</button>
+            </form>
+
+            <p class="mt-4 mb-0 small">Already enlisted? <a asp-action="Login">Log in</a>.</p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

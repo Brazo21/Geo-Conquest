@@ -371,10 +371,15 @@ public sealed class GameSession
         ArgumentNullException.ThrowIfNull(gameEvent);
 
         LastEventSequence++;
-        gameEvent.Stamp(LastEventSequence, Round, DateTime.UtcNow);
+        gameEvent.Stamp(LastEventSequence, Round, DateTime.UtcNow, CaptureBoard());
         _events.Add(gameEvent);
         return gameEvent;
     }
+
+    /// <summary>Compact snapshot of every country: "CODE.playerIndex.soldiers", comma-separated.</summary>
+    private string CaptureBoard() =>
+        string.Join(',', _countries.Select(c =>
+            $"{c.Code}.{_players.FindIndex(p => p.PlayerId == c.OwnerId)}.{c.SoldierCount}"));
 
     /// <summary>Events newer than <paramref name="sequence"/>, oldest first (used by live polling).</summary>
     public IReadOnlyList<GameEvent> GetEventsSince(long sequence) =>

@@ -1,0 +1,17 @@
+@{
+    ViewData["Title"] = "Access denied";
+}
+
+<div class="row justify-content-center py-5">
+    <div class="col-lg-6">
+        <div class="cr-panel cr-red-edge p-4 text-center">
+            <div class="cr-label justify-content-center"><span class="cr-red">Access denied</span></div>
+            <h1 class="cr-title mb-2">You can watch, but not play this one</h1>
+            <p class="cr-sub mb-4">Only the commander who started a game can make its moves.</p>
+            <div class="d-flex flex-wrap gap-2 justify-content-center">
+                <a class="cr-btn green" asp-controller="Games" asp-action="New">Start your own game</a>
+                <a class="cr-btn" asp-controller="Games" asp-action="Index" asp-route-scope="live">Watch live games</a>
+            </div>
+        </div>
+    </div>
+</div>

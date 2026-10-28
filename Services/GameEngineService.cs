@@ -1,5 +1,6 @@
 using GeoConquest.Models.Domain;
 using GeoConquest.Repositories;
+using GeoConquest.Services.Commentary;
 using GeoConquest.Services.Npc;
 
 namespace GeoConquest.Services;
@@ -32,6 +33,7 @@ public sealed class GameEngineService : IGameEngineService
     private readonly IRandomSource _random;
     private readonly IBattleOddsCalculator _odds;
     private readonly INpcStrategy _npc;
+    private readonly ICommentaryService _commentary;
     private readonly ILogger<GameEngineService> _logger;
 
     public GameEngineService(
@@ -40,6 +42,7 @@ public sealed class GameEngineService : IGameEngineService
         IRandomSource random,
         IBattleOddsCalculator odds,
         INpcStrategy npc,
+        ICommentaryService commentary,
         ILogger<GameEngineService> logger)
     {
         _repository = repository;
@@ -47,6 +50,7 @@ public sealed class GameEngineService : IGameEngineService
         _random = random;
         _odds = odds;
         _npc = npc;
+        _commentary = commentary;
         _logger = logger;
     }
 
@@ -108,6 +112,7 @@ public sealed class GameEngineService : IGameEngineService
         BeginTurn(session);
         RunNpcTurnsUntilHuman(session);
 
+        await _commentary.AnnotateAsync(session, afterSequence: 0, cancellationToken);
         await _repository.InsertAsync(session, cancellationToken);
         _logger.LogInformation("Game {GameId} created by {UserId} with {NpcCount} NPCs", session.Id, userId, npcCount);
         return session;
@@ -116,7 +121,7 @@ public sealed class GameEngineService : IGameEngineService
     public async Task<GameSession> GetGameAsync(string gameId, CancellationToken cancellationToken = default) =>
         await _repository.GetByIdAsync(gameId, cancellationToken) ?? throw new GameNotFoundException(gameId);
 
-    public Task<GameSession> PlaceReinforcementsAsync(string gameId, string userId, string countryCode, int amount,
+    public Task<MoveOutcome> PlaceReinforcementsAsync(string gameId, string userId, string countryCode, int amount,
         CancellationToken cancellationToken = default) =>
         ExecuteHumanActionAsync(gameId, userId, (session, human) =>
         {
@@ -127,19 +132,19 @@ public sealed class GameEngineService : IGameEngineService
                 human.PlayerId, toCountryCode: country.Code));
         }, cancellationToken);
 
-    public Task<GameSession> TransferAsync(string gameId, string userId, string fromCode, string toCode, int amount,
+    public Task<MoveOutcome> TransferAsync(string gameId, string userId, string fromCode, string toCode, int amount,
         CancellationToken cancellationToken = default) =>
         ExecuteHumanActionAsync(gameId, userId,
             (session, human) => ApplyTransfer(session, human, fromCode, toCode, amount, reason: null),
             cancellationToken);
 
-    public Task<GameSession> StartAttackAsync(string gameId, string userId, string fromCode, string toCode,
+    public Task<MoveOutcome> StartAttackAsync(string gameId, string userId, string fromCode, string toCode,
         CancellationToken cancellationToken = default) =>
         ExecuteHumanActionAsync(gameId, userId,
             (session, human) => ApplyBeginAttack(session, human, fromCode, toCode, reason: null),
             cancellationToken);
 
-    public Task<GameSession> RollAsync(string gameId, string userId, CancellationToken cancellationToken = default) =>
+    public Task<MoveOutcome> RollAsync(string gameId, string userId, CancellationToken cancellationToken = default) =>
         ExecuteHumanActionAsync(gameId, userId, (session, human) =>
         {
             if (session.Phase != TurnPhase.Attacking)
@@ -148,14 +153,14 @@ public sealed class GameEngineService : IGameEngineService
             ExecuteRoll(session, human);
         }, cancellationToken);
 
-    public Task<GameSession> RetreatAsync(string gameId, string userId, CancellationToken cancellationToken = default) =>
+    public Task<MoveOutcome> RetreatAsync(string gameId, string userId, CancellationToken cancellationToken = default) =>
         ExecuteHumanActionAsync(gameId, userId, (session, human) =>
         {
             ApplyRetreat(session, human, reason: null);
             EndTurnAndPlayNpcs(session);
         }, cancellationToken);
 
-    public Task<GameSession> EndTurnAsync(string gameId, string userId, CancellationToken cancellationToken = default) =>
+    public Task<MoveOutcome> EndTurnAsync(string gameId, string userId, CancellationToken cancellationToken = default) =>
         ExecuteHumanActionAsync(gameId, userId, (session, _) =>
         {
             if (session.Phase == TurnPhase.Attacking)
@@ -176,7 +181,7 @@ public sealed class GameEngineService : IGameEngineService
 
     // ═════════════════════════════ Authorization + persistence ═════════════════════════════
 
-    private async Task<GameSession> ExecuteHumanActionAsync(string gameId, string userId,
+    private async Task<MoveOutcome> ExecuteHumanActionAsync(string gameId, string userId,
         Action<GameSession, Player> action, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(userId))
@@ -191,10 +196,12 @@ public sealed class GameEngineService : IGameEngineService
         if (!session.CanUserAct(userId))
             throw new DomainException("It is not your turn yet.");
 
+        long seenUpTo = session.LastEventSequence;
         action(session, session.GetCurrentPlayer());
 
+        await _commentary.AnnotateAsync(session, seenUpTo, cancellationToken);
         await _repository.UpdateAsync(session, cancellationToken);
-        return session;
+        return new MoveOutcome(session, seenUpTo);
     }
 
     // ═════════════════════════════ Turn flow ═════════════════════════════

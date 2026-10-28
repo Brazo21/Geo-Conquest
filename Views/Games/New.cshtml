@@ -1,0 +1,94 @@
+@model NewGameViewModel
+@{
+    ViewData["Title"] = "New game";
+    var tiers = Model.Countries
+        .GroupBy(c => c.SoldierValue)
+        .OrderByDescending(g => g.Key);
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">New campaign · pick your country</h1>
+        <div class="cr-sub cr-upper">Population sets your starting soldiers (1–9). Nine rivals are drawn at random.</div>
+    </div>
+</div>
+
+<form asp-action="New" method="post" novalidate>
+    <div asp-validation-summary="ModelOnly" class="mb-2"></div>
+
+    <div class="cr-console mb-3">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label for="country-search" class="form-label">Search countries</label>
+                <input id="country-search" type="search" class="form-control" placeholder="e.g. South Africa" autocomplete="off" />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Input.NpcCount" class="form-label">NPC opponents</label>
+                <select asp-for="Input.NpcCount" class="form-select">
+                    @for (int n = 9; n >= 1; n--)
+                    {
+                        <option value="@n">@n @(n == 9 ? "· one per country" : "")</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="cr-btn red w-100">Deploy · start game</button>
+            </div>
+        </div>
+        <div id="picked" class="cr-upper small mt-3" style="color:#ece4cc">No country selected yet</div>
+        <span asp-validation-for="Input.CountryCode" class="d-block small mt-1"></span>
+    </div>
+
+    @foreach (var tier in tiers)
+    {
+        <div class="cr-panel country-tier">
+            <div class="cr-label"><span>@tier.Key soldier@(tier.Key == 1 ? "" : "s") · @(tier.Key == 9 ? "over 150M people" : $"up to {(new[] { 0, 5, 10, 25, 50, 75, 100, 125, 150 })[tier.Key]}M people")</span></div>
+            <div class="row g-2 cr-pick">
+                @foreach (var country in tier.OrderBy(c => c.Name))
+                {
+                    <div class="col-6 col-md-4 col-xl-2 country-option" data-name="@country.Name.ToLowerInvariant()">
+                        @if (Model.Input.CountryCode == country.Code)
+                        {
+                            <input type="radio" name="Input.CountryCode" id="c-@country.Code" value="@country.Code" data-label="@country.Name · @country.SoldierValue soldiers" checked />
+                        }
+                        else
+                        {
+                            <input type="radio" name="Input.CountryCode" id="c-@country.Code" value="@country.Code" data-label="@country.Name · @country.SoldierValue soldiers" />
+                        }
+                        <label for="c-@country.Code">
+                            <span class="fw-semibold">@country.Name</span><br />
+                            <span class="pop">@country.Population.ToString("N0")</span>
+                        </label>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</form>
+
+@section Scripts {
+    <script>
+        // Instant filter + selection readout. The server still validates the chosen country.
+        (function () {
+            const search = document.getElementById('country-search');
+            const picked = document.getElementById('picked');
+
+            search.addEventListener('input', function () {
+                const term = this.value.trim().toLowerCase();
+                document.querySelectorAll('.country-option').forEach(el =>
+                    el.classList.toggle('d-none', term !== '' && !el.dataset.name.includes(term)));
+                document.querySelectorAll('.country-tier').forEach(tier =>
+                    tier.classList.toggle('d-none', tier.querySelectorAll('.country-option:not(.d-none)').length === 0));
+            });
+
+            function showPick() {
+                const r = document.querySelector('input[name="Input.CountryCode"]:checked');
+                picked.innerHTML = r
+                    ? `Selected: <span style="color:var(--cr-green)">${r.dataset.label}</span>`
+                    : 'No country selected yet';
+            }
+            document.querySelectorAll('input[name="Input.CountryCode"]').forEach(r => r.addEventListener('change', showPick));
+            showPick();
+        })();
+    </script>
+}

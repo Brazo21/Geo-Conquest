@@ -1,5 +1,7 @@
 using GeoConquest.Data;
 using GeoConquest.Models.Domain;
+using System.Text.RegularExpressions;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace GeoConquest.Repositories;
@@ -28,6 +30,39 @@ public sealed class MongoGameRepository : IGameRepository
         return await _games
             .Find(g => g.Id == id)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<GameSession>> SearchAsync(GameQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var f = Builders<GameSession>.Filter;
+        var filter = f.Empty;
+
+        if (!string.IsNullOrWhiteSpace(query.OwnerUserId))
+            filter &= f.Eq(g => g.OwnerUserId, query.OwnerUserId);
+
+        if (query.Status is not null)
+            filter &= f.Eq(g => g.Status, query.Status.Value);
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            // Escape user input so it is matched literally (no regex injection).
+            var pattern = new BsonRegularExpression(Regex.Escape(query.Search.Trim()), "i");
+            filter &= f.Or(
+                f.Regex("players.displayName", pattern),
+                f.Regex("countries.name", pattern));
+        }
+
+        int limit = Math.Clamp(query.Limit, 1, 100);
+
+        var games = await _games
+            .Find(filter)
+            .Project<GameSession>(Builders<GameSession>.Projection.Exclude("events"))
+            .SortByDescending(g => g.UpdatedAtUtc)
+            .Limit(limit)
+            .ToListAsync(cancellationToken);
+
+        return games.AsReadOnly();
     }
 
     public async Task InsertAsync(GameSession session, CancellationToken cancellationToken = default)

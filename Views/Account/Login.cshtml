@@ -1,0 +1,45 @@
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Log in";
+}
+
+<div class="row justify-content-center py-lg-4">
+    <div class="col-md-8 col-lg-5">
+        <div class="cr-panel cr-glow p-4">
+            <div class="cr-label"><span>Authentication required</span></div>
+            <h1 class="cr-title mb-1">Log in, Commander</h1>
+            <p class="cr-sub mb-4">Your campaigns are waiting.</p>
+
+            <form asp-action="Login" method="post" novalidate>
+                <div asp-validation-summary="ModelOnly" class="mb-3"></div>
+                <input type="hidden" asp-for="ReturnUrl" />
+
+                <div class="mb-3">
+                    <label asp-for="Login" class="form-label"></label>
+                    <input asp-for="Login" class="form-control" autocomplete="username" autofocus />
+                    <span asp-validation-for="Login" class="small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" class="form-control" autocomplete="current-password" />
+                    <span asp-validation-for="Password" class="small"></span>
+                </div>
+
+                <div class="form-check mb-4">
+                    <input asp-for="RememberMe" class="form-check-input" />
+                    <label asp-for="RememberMe" class="form-check-label small"></label>
+                </div>
+
+                <button type="submit" class="cr-btn green w-100">Log in</button>
+            </form>
+
+            <p class="mt-4 mb-1 small">No account yet? <a asp-action="Register">Sign up free</a>.</p>
+            <p class="cr-sub mb-0">Just watching? <a asp-controller="Games" asp-action="Index" asp-route-scope="live">Browse live games</a>, no account needed.</p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

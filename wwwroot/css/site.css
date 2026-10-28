@@ -20,3 +20,38 @@ html {
 body {
   margin-bottom: 60px;
 }
+/* ── GeoConquest ─────────────────────────────────────────── */
+.dot {
+  display: inline-block;
+  width: .7rem;
+  height: .7rem;
+  border-radius: 50%;
+  margin-right: .35rem;
+  vertical-align: middle;
+}
+
+.die {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid currentColor;
+  border-radius: .35rem;
+  font-weight: 700;
+  font-family: var(--bs-font-monospace);
+}
+
+.event-log {
+  max-height: 34rem;
+  overflow-y: auto;
+}
+
+@keyframes geo-flash {
+  from { background-color: rgba(255, 193, 7, .55); }
+  to   { background-color: transparent; }
+}
+
+tr.flash > td {
+  animation: geo-flash 1.2s ease-out;
+}

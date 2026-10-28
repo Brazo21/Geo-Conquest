@@ -1,0 +1,113 @@
+@{
+    ViewData["Title"] = "How to play";
+    bool loggedIn = User.Identity?.IsAuthenticated == true;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Briefing · How to play</h1>
+        <div class="cr-sub cr-upper">Read this once, Commander. Then the world is yours to take.</div>
+    </div>
+    @if (loggedIn)
+    {
+        <a class="cr-btn green" asp-controller="Games" asp-action="New">Start a new game →</a>
+    }
+</div>
+
+<div class="row g-3 mb-3">
+    @foreach (var (n, title, text) in new[]
+    {
+        ("1", "Pick a country", "Its population sets your starting soldiers: from 1 (Vatican City) up to 9 (India, China, USA…)."),
+        ("2", "Roll and attack", "Dice duel soldier against soldier. The higher die wins; a tie changes nothing."),
+        ("3", "Reinforce", "From round 2 you get +2 soldiers for every country you hold, placed wherever you like."),
+        ("4", "Own all 10", "Conquer every nation to win. Lose every country you hold and your campaign is over.")
+    })
+    {
+        <div class="col-md-6 col-xl-3">
+            <div class="cr-panel h-100">
+                <div class="cr-label"><span>Step @n</span></div>
+                <div class="cr-readout mb-2" style="font-size:1.15rem">@title</div>
+                <div>@text</div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Dice example · attacker 10 soldiers vs defender 2</span></div>
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <span class="cr-die" style="color:var(--cr-green)"><span>1</span></span>
+                <span class="cr-muted">vs</span>
+                <span class="cr-die won" style="color:var(--cr-red)"><span>2</span></span>
+                <span class="cr-upper small">Defender wins · attacker −1</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <span class="cr-die won" style="color:var(--cr-green)"><span>4</span></span>
+                <span class="cr-muted">vs</span>
+                <span class="cr-die" style="color:var(--cr-red)"><span>3</span></span>
+                <span class="cr-upper small">Attacker wins · defender −1</span>
+            </div>
+            <p class="small mb-0">
+                Dice rolled each round = the smaller of (your soldiers − 1) and the defender's soldiers,
+                because one of your soldiers always stays home. Each die is one soldier; die 1 fights die 1, die 2 fights die 2.
+            </p>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Rules at a glance</span></div>
+            <ul class="mb-0 ps-3" style="line-height:1.9">
+                <li>One attack per turn. You need at least <strong class="cr-amber">2 soldiers</strong> to attack.</li>
+                <li>The attack ends when the enemy hits <strong class="cr-amber">0</strong>, you're down to <strong class="cr-amber">1</strong>, or you retreat (which ends your turn).</li>
+                <li>Conquest spoils: <strong class="cr-amber">Max(2, country value ÷ 2)</strong> soldiers.</li>
+                <li>Move soldiers between your countries any time you're not mid-attack. Every country keeps at least 1.</li>
+                <li>You can skip your turn at any time.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-7">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Your command room</span></div>
+            <ul class="mb-0 ps-3" style="line-height:1.9">
+                <li><strong class="cr-amber">World map</strong>: every country's pin shows its soldiers in its owner's colour. Click an enemy pin to target it.</li>
+                <li><strong class="cr-amber">Controls</strong>: Attack, Skip turn, Transfer and Place. <strong>Win odds</strong> update as you choose a target.</li>
+                <li><strong class="cr-amber">NPC decisions</strong>: every computer move comes with a one-line "why".</li>
+                <li><strong class="cr-amber">AI commentary</strong>: an AI sports commentator calls each battle as it happens.</li>
+                <li><strong class="cr-amber">Fast-forward 1× 2× 4×</strong>: speeds up NPC turns but still shows every move.</li>
+            </ul>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Know your enemy</span></div>
+            <div class="cr-cards" style="grid-template-columns:1fr">
+                <div class="cr-card" style="--pc:var(--cr-red)"><div class="head"><span>The Aggressor</span><span class="tag">AGG</span></div>Strikes the weakest target, rarely retreats.</div>
+                <div class="cr-card" style="--pc:var(--cr-blue)"><div class="head"><span>The Defender</span><span class="tag">DEF</span></div>Builds big garrisons, attacks only with strong odds.</div>
+                <div class="cr-card" style="--pc:var(--cr-purple)"><div class="head"><span>The Opportunist</span><span class="tag">OPP</span></div>Waits for others to bleed, then strikes.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="cr-panel cr-green-edge d-flex flex-wrap justify-content-between align-items-center gap-3">
+    <span class="cr-readout cr-green" style="font-size:1rem">Ready, Commander? Playing needs a free account. Watching does not.</span>
+    @if (loggedIn)
+    {
+        <span class="d-flex flex-wrap gap-2">
+            <a class="cr-btn green" asp-controller="Games" asp-action="New">Start a new game →</a>
+            <a class="cr-btn" asp-controller="Games" asp-action="Index" asp-route-scope="mine">My games</a>
+        </span>
+    }
+    else
+    {
+        <span class="d-flex flex-wrap gap-2">
+            <a class="cr-btn green" asp-controller="Account" asp-action="Register">Sign up</a>
+            <a class="cr-btn" asp-controller="Account" asp-action="Login">Log in</a>
+        </span>
+    }
+</div>

@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Geo_Conquest</RootNamespace>
+    <UserSecretsId>c34efc5f-a342-4df5-894e-f3bf2e1e9455</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

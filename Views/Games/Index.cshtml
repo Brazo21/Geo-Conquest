@@ -1,0 +1,131 @@
+@model GameListViewModel
+@{
+    ViewData["Title"] = Model.Scope switch
+    {
+        GameListViewModel.ScopeMine => "My games",
+        GameListViewModel.ScopeAll => "All games",
+        _ => "Live games"
+    };
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">@ViewData["Title"]</h1>
+        <div class="cr-sub cr-upper">
+            @(Model.Scope switch
+            {
+                GameListViewModel.ScopeMine => "Your campaigns · pick one up where you left off",
+                GameListViewModel.ScopeAll => "Every campaign on the platform",
+                _ => "Campaigns in progress right now · anyone can watch"
+            })
+        </div>
+    </div>
+    @if (Model.IsLoggedIn)
+    {
+        <a class="cr-btn green" asp-action="New">+ Start a new game</a>
+    }
+    else
+    {
+        <a class="cr-btn green" asp-controller="Account" asp-action="Register">Sign up to play</a>
+    }
+</div>
+
+<nav class="cr-tabs" aria-label="Game lists">
+    <a class="@(Model.Scope == GameListViewModel.ScopeLive ? "active" : "")" asp-action="Index" asp-route-scope="live">Live now</a>
+    @if (Model.IsLoggedIn)
+    {
+        <a class="@(Model.Scope == GameListViewModel.ScopeMine ? "active" : "")" asp-action="Index" asp-route-scope="mine">My games</a>
+    }
+    <a class="@(Model.Scope == GameListViewModel.ScopeAll ? "active" : "")" asp-action="Index" asp-route-scope="all">All games</a>
+</nav>
+
+<div class="cr-panel">
+    <form method="get" asp-action="Index" class="row g-2 mb-3" role="search">
+        <input type="hidden" name="scope" value="@Model.Scope" />
+        <div class="col-sm-6 col-md-5">
+            <input type="search" name="search" value="@Model.Search" class="form-control"
+                   placeholder="Search by commander or country" aria-label="Search games" />
+        </div>
+        @if (Model.Scope != GameListViewModel.ScopeLive)
+        {
+            <div class="col-sm-4 col-md-3">
+                <select name="status" class="form-select" aria-label="Filter by status">
+                    <option value="">Any status</option>
+                    @foreach (var status in new[] { GameStatus.InProgress, GameStatus.Completed })
+                    {
+                        var label = status == GameStatus.InProgress ? "In progress" : "Finished";
+                        if (Model.Status == status)
+                        {
+                            <option value="@status" selected>@label</option>
+                        }
+                        else
+                        {
+                            <option value="@status">@label</option>
+                        }
+                    }
+                </select>
+            </div>
+        }
+        <div class="col-auto">
+            <button type="submit" class="cr-btn">Search</button>
+            @if (!string.IsNullOrEmpty(Model.Search) || Model.Status is not null)
+            {
+                <a class="cr-btn ghost" asp-action="Index" asp-route-scope="@Model.Scope">Clear</a>
+            }
+        </div>
+    </form>
+
+    @if (Model.Games.Count == 0)
+    {
+        <div class="text-center py-5">
+            <p class="cr-readout mb-3">No games found <span class="cr-cursor"></span></p>
+            @if (Model.IsLoggedIn)
+            {
+                <a class="cr-btn green" asp-action="New">Start one now</a>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="cr-table">
+                <thead>
+                    <tr>
+                        <th>Game</th>
+                        <th>Commander</th>
+                        <th class="text-center">Round</th>
+                        <th class="text-center">Countries</th>
+                        <th class="text-center">Soldiers</th>
+                        <th>Status</th>
+                        <th>Last move</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var game in Model.Games)
+                    {
+                        bool playable = game.IsMine && game.Status == GameStatus.InProgress;
+                        <tr class="@(game.IsMine ? "mine" : "")">
+                            <td class="cr-amber">#@(game.Id[..4].ToUpperInvariant())</td>
+                            <td>
+                                @game.Commander
+                                @if (game.IsMine)
+                                {
+                                    <span class="cr-green small ms-1">[you]</span>
+                                }
+                            </td>
+                            <td class="text-center">@game.Round</td>
+                            <td class="text-center">@game.HumanCountries / 10</td>
+                            <td class="text-center">@game.HumanSoldiers</td>
+                            <td class="@(game.Outcome == "Victory" ? "cr-green" : game.Outcome == "Defeat" ? "cr-red" : "")">@game.Outcome</td>
+                            <td class="cr-muted small">@game.UpdatedAtUtc.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                            <td class="text-end">
+                                <a class="cr-btn sm @(playable ? "green" : "")" asp-action="Play" asp-route-id="@game.Id">@(playable ? "Play" : "Watch")</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

@@ -38,8 +38,17 @@ public sealed class GameEvent
     /// <summary>Attacker's chance of conquering (0–1) at this moment, if relevant.</summary>
     public double? WinOdds { get; private set; }
 
-    /// <summary>LLM-generated battle commentary, attached after the event is recorded.</summary>
+    /// <summary>Battle commentary, attached after the event is recorded.</summary>
     public string? Commentary { get; private set; }
+
+    /// <summary>True when the commentary came from the LLM; false for the built-in fallback lines.</summary>
+    public bool CommentaryIsAi { get; private set; }
+
+    /// <summary>
+    /// The whole board right after this event, as "CODE.playerIndex.soldiers" entries joined by commas
+    /// (e.g. "ZA.0.12,IN.3.4"). Lets the browser replay a turn step by step and rebuild the board at any point.
+    /// </summary>
+    public string BoardSnapshot { get; private set; } = string.Empty;
 
     public IReadOnlyList<int> AttackerDice => _attackerDice.AsReadOnly();
 
@@ -101,17 +110,28 @@ public sealed class GameEvent
         return e;
     }
 
-    /// <summary>Attaches AI commentary once (the commentary service fills this in after a roll).</summary>
-    public void AttachCommentary(string commentary)
+    public bool HasCommentary => !string.IsNullOrEmpty(Commentary);
+
+    /// <summary>Battle events get commentary; bookkeeping events (reinforcing, turn starts) do not.</summary>
+    public bool IsBattleEvent => Type is GameEventType.AttackStarted or GameEventType.DiceRolled
+        or GameEventType.CountryConquered or GameEventType.AttackFailed or GameEventType.AttackRetreated
+        or GameEventType.PlayerEliminated or GameEventType.GameWon or GameEventType.GameLost;
+
+    /// <summary>Attaches commentary once. Commentary is limited to 400 characters.</summary>
+    public void AttachCommentary(string commentary, bool isAi)
     {
         if (string.IsNullOrWhiteSpace(commentary))
             throw new DomainException("Commentary cannot be empty.");
+        if (HasCommentary)
+            throw new DomainException("This event already has commentary.");
 
-        Commentary = commentary.Trim();
+        string text = commentary.Trim();
+        Commentary = text.Length > 400 ? text[..400] : text;
+        CommentaryIsAi = isAi;
     }
 
     // Only the GameSession aggregate assigns position and time, so the log can't be reordered.
-    internal void Stamp(long sequence, int round, DateTime occurredAtUtc)
+    internal void Stamp(long sequence, int round, DateTime occurredAtUtc, string boardSnapshot)
     {
         if (Sequence != 0)
             throw new DomainException("This event has already been recorded.");
@@ -119,5 +139,6 @@ public sealed class GameEvent
         Sequence = sequence;
         Round = round;
         OccurredAtUtc = occurredAtUtc;
+        BoardSnapshot = boardSnapshot;
     }
 }
