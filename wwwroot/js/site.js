@@ -2,7 +2,7 @@
 (function () {
     'use strict';
 
-    // ── Light / dark mode ────────────────────────────────────────────────
+    // Light / dark mode
     const THEME_KEY = 'geoconquest.theme';
 
     function applyTheme(theme) {
@@ -95,9 +95,6 @@
         if (tab && window.bootstrap) window.bootstrap.Tab.getOrCreateInstance(tab).show();
     } catch { }
 
-    // ── Show / hide password ─────────────────────────────────────────────
-    // Every password box gets an eye button. The field stays type="password" until the player asks,
-    // and it is hidden again before the form is sent so the browser never saves it as plain text.
     const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M1.5 12S5.5 4.5 12 4.5 22.5 12 22.5 12 18.5 19.5 12 19.5 1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3.2"/><path class="slash" d="M3 3l18 18"/></svg>';
 
     document.querySelectorAll('input[type="password"]').forEach(input => {
@@ -133,7 +130,7 @@
         });
     });
 
-    // ── Installable app (PWA) ─────────────────────────────────────────────
+    // Installable app (PWA)
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
         window.addEventListener('load', () => {
             navigator.serviceWorker?.register('/sw.js', { scope: '/' }).catch(err => console.warn('Service worker not registered', err));

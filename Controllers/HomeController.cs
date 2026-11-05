@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Geo_Conquest.Controllers;
 
-/// <summary>Welcome page, How to Play, privacy and errors. Open to everyone.</summary>
 [AllowAnonymous]
 public class HomeController : Controller
 {
@@ -18,33 +17,22 @@ public class HomeController : Controller
         _logger = logger;
     }
 
-    /// <summary>
-    /// The first page of the site: log in or sign up. Commanders who are already logged in
-    /// go straight to their games.
-    /// </summary>
     public IActionResult Index() =>
         User.Identity?.IsAuthenticated == true
             ? RedirectToAction("Index", "Games", new { scope = "mine" })
             : View();
 
-    /// <summary>Rules and controls. New and returning players land here after logging in.</summary>
     public IActionResult HowToPlay() => View();
 
     [AllowWithoutConsent]
     public IActionResult Privacy() => View();
 
-    /// <summary>
-    /// Sound, vibration, display, dice and General preferences. Open to players and spectators;
-    /// the choices describe this device, so they are kept in the browser (validated on load).
-    /// </summary>
     [AllowWithoutConsent]
     public IActionResult Settings() => View();
 
-    /// <summary>Install GeoConquest on a phone or computer as an app (PWA).</summary>
     [AllowWithoutConsent]
     public IActionResult App() => View();
 
-    /// <summary>Unexpected server errors. The details are logged; the player sees a simple message.</summary>
     [AllowWithoutConsent]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
@@ -57,7 +45,6 @@ public class HomeController : Controller
         return View("Status", ErrorViewModel.ForStatus(500, Activity.Current?.Id ?? HttpContext.TraceIdentifier));
     }
 
-    /// <summary>Friendly pages for 404 (not found), 403 (not allowed), 429 (too many tries) and others.</summary>
     [AllowWithoutConsent]
     [Route("/Home/Status/{code:int}")]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

@@ -5,12 +5,6 @@ using GeoConquest.Services.Npc;
 
 namespace GeoConquest.Services;
 
-/// <summary>
-/// All game rules live here: setup, reinforcements, dice combat, conquest, elimination,
-/// victory and NPC turns. Controllers stay thin; the GameSession aggregate guards invariants.
-/// NPC turns are played in full on the server and recorded in the event log, so the browser
-/// can replay them at 1×, 2× or 4× (fast-forward) without skipping anything.
-/// </summary>
 public sealed class GameEngineService : IGameEngineService
 {
     public const int DefaultNpcCount = GameSession.BoardSize - 1;
@@ -18,10 +12,8 @@ public sealed class GameEngineService : IGameEngineService
     public const int ReinforcementsPerCountry = 2;
     private const int MaxNpcTurnsPerRequest = 100;
 
-    /// <summary>Anti-cheat: a battle left untouched this long counts as a retreat (closing the browser can't stall it).</summary>
+    // Anti-cheat: leaving a battle this long counts as a retreat, and an idle turn ends on its own.
     public static readonly TimeSpan AttackIdleLimit = TimeSpan.FromMinutes(5);
-
-    /// <summary>Anti-cheat: a whole turn left untouched this long ends automatically so the world keeps moving.</summary>
     public static readonly TimeSpan TurnIdleLimit = TimeSpan.FromMinutes(30);
 
     private static readonly string[] Palette =
@@ -67,7 +59,7 @@ public sealed class GameEngineService : IGameEngineService
         Failed
     }
 
-    // ═════════════════════════════ Public API ═════════════════════════════
+    // Public API
 
     public IReadOnlyList<CountryInfo> GetSelectableCountries() => _catalog.GetAll();
 
@@ -246,7 +238,7 @@ public sealed class GameEngineService : IGameEngineService
         return _odds.AttackerWinProbability(from.SoldierCount, to.SoldierCount);
     }
 
-    // ═════════════════════════════ Authorization + persistence ═════════════════════════════
+    // Authorization + persistence
 
     private async Task<MoveOutcome> ExecuteHumanActionAsync(string gameId, string userId,
         Action<GameSession, Player> action, CancellationToken cancellationToken)
@@ -284,9 +276,8 @@ public sealed class GameEngineService : IGameEngineService
         return new MoveOutcome(session, seenUpTo);
     }
 
-    // ═════════════════════════════ Turn flow ═════════════════════════════
+    // Turn flow
 
-    /// <summary>Grants reinforcements (2 per country, from round 2) and logs the turn start.</summary>
     private void BeginTurn(GameSession session)
     {
         var player = session.GetCurrentPlayer();
@@ -306,7 +297,6 @@ public sealed class GameEngineService : IGameEngineService
             session.MarkHumanActivity(DateTime.UtcNow);   // the idle clock starts when the human's turn does
     }
 
-    /// <summary>Advances to the next player, then logs any alliances whose time ran out.</summary>
     private void AdvanceTurn(GameSession session)
     {
         session.AdvanceTurn();
@@ -320,12 +310,7 @@ public sealed class GameEngineService : IGameEngineService
         }
     }
 
-    /// <summary>
-    /// Anti-cheat. If the human abandoned a battle (closed the browser, walked away) for longer than
-    /// <see cref="AttackIdleLimit"/>, the battle counts as a retreat and the turn passes. An idle turn past
-    /// <see cref="TurnIdleLimit"/> ends automatically (unplaced reinforcements go to the strongest country).
-    /// Nothing is ever rolled back or re-rolled. Returns a message when it acted, otherwise null.
-    /// </summary>
+    // Runs before any move and whenever someone views the game, so closing the browser can't stall it.
     private string? ApplyTimeoutIfDue(GameSession session)
     {
         if (session.Status != GameStatus.InProgress || !session.GetCurrentPlayer().IsHuman())
@@ -402,7 +387,7 @@ public sealed class GameEngineService : IGameEngineService
         }
     }
 
-    // ═════════════════════════════ NPC turn ═════════════════════════════
+    // NPC turn
 
     private void PlayNpcTurn(GameSession session, Player npc)
     {
@@ -472,7 +457,7 @@ public sealed class GameEngineService : IGameEngineService
             ApplyTransfer(session, npc, fortify.FromCode, fortify.ToCode, fortify.Amount, fortify.Reason);
     }
 
-    // ═════════════════════════════ Shared actions (human + NPC) ═════════════════════════════
+    // Shared actions (human + NPC)
 
     private void ApplyTransfer(GameSession session, Player player, string fromCode, string toCode, int amount, string? reason)
     {
@@ -509,10 +494,6 @@ public sealed class GameEngineService : IGameEngineService
             player.PlayerId, reason, attacker.Code, defender.Code));
     }
 
-    /// <summary>
-    /// One roll: n = min(attacker − 1, defender) dice each, paired in order (die 1 vs die 1, …).
-    /// Higher die wins the pair; ties change nothing.
-    /// </summary>
     private RollResult ExecuteRoll(GameSession session, Player player)
     {
         var attacker = session.GetActiveAttacker();
@@ -565,7 +546,6 @@ public sealed class GameEngineService : IGameEngineService
         return RollResult.Continue;
     }
 
-    /// <summary>Takes the country, pays Max(2, value / 2) spoils, then checks elimination and victory.</summary>
     private void Conquer(GameSession session, Player conqueror, Country attacker, Country defender)
     {
         var loser = session.GetPlayer(defender.OwnerId);

@@ -10,10 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace GeoConquest.Controllers;
 
-/// <summary>
-/// Account administration. Only the Admin role gets in (checked by the cookie role here, and again against
-/// the database inside <see cref="IAdminService"/>). Thin: every rule lives in the service.
-/// </summary>
 [Authorize(Roles = UserAccount.AdminRole)]
 public sealed class AdminController : Controller
 {
@@ -96,7 +92,6 @@ public sealed class AdminController : Controller
         }
     }
 
-    /// <summary>Runs one admin action and turns rule violations into a friendly message.</summary>
     private async Task<IActionResult> RunAsync(string id, Func<Task> action, string success)
     {
         if (!IsUserId(id))
@@ -130,6 +125,5 @@ public sealed class AdminController : Controller
 
     private string FirstError() => ModelState.Values.SelectMany(v => v.Errors).First().ErrorMessage;
 
-    /// <summary>User ids are 32 lowercase hex characters, like game ids.</summary>
     private static bool IsUserId(string? id) => InputGuard.IsGameId(id);
 }

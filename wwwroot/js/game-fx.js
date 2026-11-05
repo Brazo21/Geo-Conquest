@@ -1,6 +1,3 @@
-// Reactions to the live game feed: sound effects, vibration, screen effects and the General.
-// game-feed.js raises a "geo:event" for every event it shows (your moves, NPC moves and
-// spectator updates alike), so this file never has to know how the feed works.
 (function () {
     'use strict';
 
@@ -18,7 +15,7 @@
         if (!cfg.isSpectator) A()?.vibrate(name);
     }
 
-    // ── Full-screen moments (victory / defeat) ─────────────────────────────
+    // Full-screen moments (victory / defeat)
     function overlay(kind, text) {
         const fx = document.createElement('div');
         fx.className = `cr-fx ${kind}`;
@@ -49,7 +46,7 @@
         document.addEventListener('submit', () => window.removeEventListener('beforeunload', warn), true);
     }
 
-    // ── Event reactions ────────────────────────────────────────────────────
+    // Event reactions
     window.addEventListener('geo:event', ({ detail }) => {
         const { e, actor, prevOwnerId } = detail;
         const mine = !!actor?.isHuman;

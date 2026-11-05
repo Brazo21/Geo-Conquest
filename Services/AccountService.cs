@@ -13,51 +13,34 @@ namespace GeoConquest.Services;
 
 public interface IAccountService
 {
-    /// <summary>Creates an account. Throws <see cref="DomainException"/> or <see cref="DuplicateAccountException"/>.</summary>
     Task<UserAccount> RegisterAsync(string username, string email, string displayName, string password,
         bool popiaConsent, CancellationToken cancellationToken = default);
 
-    /// <summary>Returns the account if the login and password match, otherwise null. Suspended accounts are returned too: the caller blocks them.</summary>
     Task<UserAccount?> ValidateLoginAsync(string usernameOrEmail, string password,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Builds the identity stored in the authentication cookie.</summary>
     ClaimsPrincipal CreatePrincipal(UserAccount account);
 
     Task<UserAccount?> GetAsync(string userId, CancellationToken cancellationToken = default);
 
-    /// <summary>Records POPIA consent for a user who signed up before the notice existed (or before it changed).</summary>
     Task<UserAccount> RecordConsentAsync(string userId, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Emails a single-use reset link if the login matches an active account. Does nothing visible otherwise,
-    /// so the page never reveals which emails are registered. <paramref name="buildLink"/> gets (userId, token).
-    /// Returns the link only so development mode can show it when email is not configured.
-    /// </summary>
     Task<string?> RequestPasswordResetAsync(string usernameOrEmail, Func<string, string, string> buildLink,
         CancellationToken cancellationToken = default);
 
     Task<bool> IsResetLinkValidAsync(string userId, string token, CancellationToken cancellationToken = default);
 
-    /// <summary>Sets a new password from a reset link. Throws <see cref="DomainException"/> if the link is invalid or used.</summary>
     Task ResetPasswordAsync(string userId, string token, string newPassword, CancellationToken cancellationToken = default);
 
-    /// <summary>Changes the password after checking the current one. Signs out other devices; returns the updated account.</summary>
     Task<UserAccount> ChangePasswordAsync(string userId, string currentPassword, string newPassword,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Changes the email after checking the password. The old address is told about the change.</summary>
     Task<UserAccount> ChangeEmailAsync(string userId, string currentPassword, string newEmail,
         CancellationToken cancellationToken = default);
 
-    /// <summary>POPIA right to erasure: deletes the account and every game it owns after checking the password.</summary>
     Task DeleteOwnAccountAsync(string userId, string password, CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Registration, login, consent and password resets against the MongoDB users collection.
-/// Passwords are hashed with ASP.NET Core Identity's PasswordHasher (PBKDF2, salted, iterated).
-/// </summary>
 public sealed class AccountService : IAccountService
 {
     public const string UsernameClaim = "username";

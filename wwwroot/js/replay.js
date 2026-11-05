@@ -1,6 +1,3 @@
-// Game replay for the Analytics page: territory-over-time chart + move-by-move playback.
-// The chart has one column per round; playback steps through every move that changed the board
-// (reinforcements, transfers, conquests, failed or called-off attacks), so even a round-1 game plays.
 (function () {
     'use strict';
 
@@ -29,7 +26,7 @@
         c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const nameOf = p => p ? (p.isHuman ? 'You' : p.name.split(' · ')[0]) : '?';
 
-    // ── Chart: one column per round; clicking jumps to the end of that round ──
+    // Chart: one column per round; clicking jumps to the end of that round
     rounds.forEach(r => {
         const col = document.createElement('button');
         col.type = 'button';
@@ -62,7 +59,7 @@
         .map(pi => `<span><span class="cr-swatch" style="background:${esc(data.players[pi].color)}"></span>${esc(nameOf(data.players[pi]))}</span>`)
         .join('');
 
-    // ── One step ───────────────────────────────────────────────────────────
+    // One step
     let previous = null;
     function show(index) {
         current = Math.max(0, Math.min(steps.length - 1, index));
@@ -98,7 +95,7 @@
         previous = s;
     }
 
-    // ── Playback ───────────────────────────────────────────────────────────
+    // Playback
     const playBtn = document.getElementById('rp-play');
 
     function stop() {

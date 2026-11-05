@@ -1,6 +1,5 @@
 namespace GeoConquest.Models.Domain;
 
-/// <summary>Lifecycle of a game session.</summary>
 public enum GameStatus
 {
     Setup,
@@ -9,14 +8,12 @@ public enum GameStatus
     Abandoned
 }
 
-/// <summary>Who controls a player seat.</summary>
 public enum PlayerType
 {
     Human,
     Npc
 }
 
-/// <summary>NPC personality used by the decision engine (Aggressor / Defender / Opportunist).</summary>
 public enum NpcProfile
 {
     None,
@@ -25,7 +22,6 @@ public enum NpcProfile
     Opportunist
 }
 
-/// <summary>Where the current player is inside their turn.</summary>
 public enum TurnPhase
 {
     NotStarted,
@@ -34,7 +30,6 @@ public enum TurnPhase
     Attacking
 }
 
-/// <summary>Kinds of entries in the game's event log (the feed spectators and the replay read).</summary>
 public enum GameEventType
 {
     GameStarted,
@@ -57,7 +52,6 @@ public enum GameEventType
     TurnTimedOut
 }
 
-/// <summary>State of a pact between two commanders.</summary>
 public enum AllianceStatus
 {
     Active,

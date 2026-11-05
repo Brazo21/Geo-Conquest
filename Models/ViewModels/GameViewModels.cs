@@ -3,7 +3,7 @@ using GeoConquest.Services;
 
 namespace GeoConquest.Models.ViewModels;
 
-// ─────────────────────────────── New game ───────────────────────────────
+// New game
 
 public sealed class NewGameViewModel
 {
@@ -12,7 +12,7 @@ public sealed class NewGameViewModel
     public IReadOnlyList<CountryInfo> Countries { get; set; } = Array.Empty<CountryInfo>();
 }
 
-// ─────────────────────────────── Game lists ───────────────────────────────
+// Game lists
 
 public sealed record GameSummaryViewModel(
     string Id,
@@ -66,7 +66,7 @@ public sealed class GameListViewModel
     public IReadOnlyList<GameSummaryViewModel> Games { get; set; } = Array.Empty<GameSummaryViewModel>();
 }
 
-// ─────────────────────────────── Play / spectate ───────────────────────────────
+// Play / spectate
 
 public sealed record PlayerRow(
     string Id, string Name, string Color, NpcProfile Profile, bool IsHuman,
@@ -76,12 +76,10 @@ public sealed record CountryRow(
     string Code, string Name, string OwnerId, string OwnerName, string Color,
     int Soldiers, int SoldierValue, bool IsMine, bool IsAllied = false);
 
-/// <summary>One pact on the board, for the Alliances panel.</summary>
 public sealed record AllianceRow(
     string FirstName, string FirstColor, string SecondName, string SecondColor,
     int UntilRound, bool InvolvesHuman, string? PartnerOfHumanId);
 
-/// <summary>An NPC the human could offer a pact to.</summary>
 public sealed record AllianceCandidate(string PlayerId, string Name, string Color, bool HoldsGrudge);
 
 public sealed record EventRow(
@@ -89,7 +87,6 @@ public sealed record EventRow(
     string Color, IReadOnlyList<int> AttackerDice, IReadOnlyList<int> DefenderDice,
     string? Commentary = null, bool CommentaryIsAi = false, string? ActorId = null);
 
-/// <summary>Where a country sits on the world map (ISO numeric id for the shape, lat/lon for the pin).</summary>
 public sealed record MapPoint(string Code, string MapId, double Lat, double Lon);
 
 public sealed record BattleView(
@@ -106,7 +103,6 @@ public sealed class PlayGameViewModel
     public string CurrentPlayerColor { get; init; } = "#FFFFFF";
     public string CommanderName { get; init; } = string.Empty;
 
-    /// <summary>True only for the logged-in owner, and only on their own turn.</summary>
     public bool CanAct { get; init; }
     public bool IsOwner { get; init; }
     public bool IsSpectator => !IsOwner;
@@ -116,12 +112,10 @@ public sealed class PlayGameViewModel
     public string? OutcomeMessage { get; init; }
     public long LastEventSequence { get; init; }
 
-    /// <summary>When set, the page replays every event after this sequence (the move just made + NPC turns).</summary>
     public long? ReplayFrom { get; set; }
 
     public bool IsReplaying => ReplayFrom is not null;
 
-    /// <summary>Map positions for the 10 countries on this board.</summary>
     public IReadOnlyList<MapPoint> MapPoints { get; set; } = Array.Empty<MapPoint>();
 
     public string ShortId => GameId.Length > 4 ? GameId[..4].ToUpperInvariant() : GameId.ToUpperInvariant();
@@ -132,7 +126,6 @@ public sealed class PlayGameViewModel
 
     public int MaxPlayerSoldiers => Math.Max(1, Players.Max(p => p.Soldiers));
 
-    /// <summary>Events of the attack in progress, oldest first (for the engagement terminal's battle log).</summary>
     public IReadOnlyList<EventRow> CurrentBattleEvents =>
         Battle is null
             ? Array.Empty<EventRow>()
@@ -141,13 +134,10 @@ public sealed class PlayGameViewModel
                 .Reverse()
                 .ToList();
 
-    /// <summary>The most recent NPC decisions that carry a "why" (shown in the NPC decisions panel).</summary>
     public IEnumerable<EventRow> RecentDecisions => Events.Where(e => e.Reasoning is not null).Take(6);
 
-    /// <summary>The latest battle roll anywhere in the game (for the "Last roll" box).</summary>
     public EventRow? LastRoll => Events.FirstOrDefault(e => e.Type == GameEventType.DiceRolled);
 
-    /// <summary>Newest piece of battle commentary.</summary>
     public EventRow? LatestCommentary => Events.FirstOrDefault(e => e.Commentary is not null);
 
     public IReadOnlyList<PlayerRow> Players { get; init; } = Array.Empty<PlayerRow>();
@@ -156,10 +146,9 @@ public sealed class PlayGameViewModel
     public BattleView? Battle { get; init; }
 
     public IEnumerable<CountryRow> MyCountries => Countries.Where(c => c.IsMine);
-    /// <summary>Countries the human may attack: not their own, and not an ally's.</summary>
     public IEnumerable<CountryRow> EnemyCountries => Countries.Where(c => !c.IsMine && !c.IsAllied);
 
-    // ── Alliances ──
+    // Alliances
     public IReadOnlyList<AllianceRow> Alliances { get; init; } = Array.Empty<AllianceRow>();
     public AllianceRow? HumanAlliance => Alliances.FirstOrDefault(a => a.InvolvesHuman);
     public IReadOnlyList<AllianceCandidate> AllianceCandidates { get; init; } = Array.Empty<AllianceCandidate>();
@@ -168,7 +157,6 @@ public sealed class PlayGameViewModel
                                       !AllianceProposedThisTurn && AllianceCandidates.Count > 0;
     public bool CanBreakAlliance => CanAct && Phase != TurnPhase.Attacking && HumanAlliance is not null;
 
-    /// <summary>The general's answer to this turn's proposal (shown right under the Alliance controls).</summary>
     public EventRow? LastAllianceAnswer =>
         Events.FirstOrDefault(e => e.Type is GameEventType.AllianceFormed or GameEventType.AllianceRejected && e.Round == Round);
     public IEnumerable<CountryRow> AttackSources => MyCountries.Where(c => c.Soldiers >= Country.MinimumAttackingStrength);

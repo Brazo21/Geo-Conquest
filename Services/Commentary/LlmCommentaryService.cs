@@ -8,12 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace GeoConquest.Services.Commentary;
 
-/// <summary>
-/// Generates sports-style battle commentary with an LLM through an OpenAI-compatible
-/// chat-completions endpoint (Gemini by default). All battle events from one request are
-/// sent in a single call, and the model replies with one line per event as JSON.
-/// Any event the AI misses (or every event, if the call fails) gets a fallback line.
-/// </summary>
 public sealed class LlmCommentaryService : ICommentaryService
 {
     public const string HttpClientName = "commentary";
@@ -69,10 +63,6 @@ public sealed class LlmCommentaryService : ICommentaryService
         }
     }
 
-    /// <summary>
-    /// Keeps AI requests small (and fast): every decisive moment first (attacks, conquests, failures,
-    /// retreats, eliminations), newest first, then the most recent dice rolls. Returned oldest first.
-    /// </summary>
     private static List<GameEvent> SelectForAi(IReadOnlyList<GameEvent> pending, int max)
     {
         var decisive = pending.Where(e => e.Type != GameEventType.DiceRolled).OrderByDescending(e => e.Sequence);
@@ -84,11 +74,6 @@ public sealed class LlmCommentaryService : ICommentaryService
             .ToList();
     }
 
-    /// <summary>
-    /// Tries the main model, then each fallback model, within one overall time budget.
-    /// Busy (503), rate-limited (429), missing (404) or slow models are skipped. Never throws
-    /// for AI problems: an empty result means every event gets a fallback line.
-    /// </summary>
     private async Task<Dictionary<long, string>> RequestWithFallbacksAsync(GameSession session,
         IReadOnlyList<GameEvent> events, CancellationToken cancellationToken)
     {
@@ -217,7 +202,7 @@ public sealed class LlmCommentaryService : ICommentaryService
         return firstNewline >= 0 && lastFence > firstNewline ? text[(firstNewline + 1)..lastFence].Trim() : text;
     }
 
-    // ── OpenAI-compatible wire format ─────────────────────────────────────────
+    // OpenAI-compatible wire format
 
     private sealed record ChatRequest(
         string Model,

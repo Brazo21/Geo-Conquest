@@ -1,6 +1,5 @@
 namespace Geo_Conquest.Models;
 
-/// <summary>What the friendly error page shows. Never contains technical details.</summary>
 public class ErrorViewModel
 {
     public string? RequestId { get; set; }

@@ -18,18 +18,12 @@ public interface IAdminService
 
     Task SetAdminAsync(string adminId, string userId, bool makeAdmin, CancellationToken cancellationToken = default);
 
-    /// <summary>Emails the user a reset link (the admin never sees or sets their password).</summary>
     Task SendResetLinkAsync(string adminId, string userId, Func<string, string, string> buildLink,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes the account and its games. The admin must type the username to confirm.</summary>
     Task<string> DeleteAsync(string adminId, string userId, string confirmUsername, CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Account administration. Rules enforced here (not in the views): admins cannot act on their own account,
-/// and the last active admin can never be suspended, demoted or deleted. Every action is logged with who did it.
-/// </summary>
 public sealed class AdminService : IAdminService
 {
     private readonly IUserRepository _users;
@@ -138,7 +132,7 @@ public sealed class AdminService : IAdminService
         return target.Username;
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────
+    // helpers
 
     private async Task<(UserAccount Admin, UserAccount Target)> LoadAsync(string adminId, string userId, CancellationToken ct)
     {

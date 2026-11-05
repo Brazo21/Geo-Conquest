@@ -4,7 +4,6 @@ using GeoConquest.Repositories;
 
 namespace GeoConquest.Models.ViewModels;
 
-/// <summary>One account as the admin panel shows it. No password hash or reset token ever leaves the service.</summary>
 public sealed record AdminAccountRow(
     string Id,
     string Username,

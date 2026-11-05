@@ -1,7 +1,3 @@
-// GeoConquest live feed for the command room.
-// • Replay: after each move, plays every new event (your move, then each NPC turn) step by step.
-// • Fast-forward: 1× / 2× / 4× only changes the pace — every move, die and NPC reason is still shown.
-// • Spectators: polls for new events and plays them as they happen (real-time viewing).
 (function () {
     'use strict';
 
@@ -23,7 +19,7 @@
     // Who owns each country right now, so effects can tell when one of *your* countries is hit.
     const owners = Object.fromEntries(cfg.countries.map(c => [c.code, c.ownerId]));
 
-    // ── Speed controls (there may be one set per layout) ───────────────────
+    // Speed controls (there may be one set per layout)
     function paintSpeed() {
         document.querySelectorAll('[data-speed]').forEach(b => b.classList.toggle('active', Number(b.dataset.speed) === speed));
     }
@@ -38,7 +34,7 @@
         try { return Number(localStorage.getItem(SPEED_KEY)) || 1; } catch { return 1; }
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
+    // Helpers
     const esc = s => String(s ?? '').replace(/[&<>"']/g,
         c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -60,7 +56,7 @@
         });
     }
 
-    // ── Board-wide updates from a snapshot ─────────────────────────────────
+    // Board-wide updates from a snapshot
     function applyBoard(board) {
         const entries = decodeBoard(board);
         if (!entries.length) return;
@@ -129,7 +125,7 @@
         });
     }
 
-    // ── Panels ─────────────────────────────────────────────────────────────
+    // Panels
     function addToLog(e) {
         const log = $('event-log');
         if (!log) return;
@@ -224,7 +220,7 @@
         setSim(true, actor && !actor.isHuman ? `NPC simulation active · ${actor.name.split(' · ')[0]}` : 'Simulation active');
     }
 
-    // ── Playback ───────────────────────────────────────────────────────────
+    // Playback
     function delayFor(e) {
         const actor = feedPlayer(e.actor);
         // Dice need time to tumble and land before the next event replaces them.

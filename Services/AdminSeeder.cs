@@ -5,7 +5,6 @@ using Microsoft.Extensions.Options;
 
 namespace GeoConquest.Services;
 
-/// <summary>"Admin" section: the first administrator. Keep it in User Secrets, never in appsettings.json.</summary>
 public sealed class AdminSeedSettings
 {
     public const string SectionName = "Admin";
@@ -16,14 +15,9 @@ public sealed class AdminSeedSettings
 
     public string DisplayName { get; init; } = "Site Admin";
 
-    /// <summary>Only used when the account doesn't exist yet. Change it after the first login.</summary>
     public string Password { get; init; } = string.Empty;
 }
 
-/// <summary>
-/// Makes sure there is an administrator at start-up: promotes the configured username if it exists,
-/// otherwise creates it. Does nothing when no admin is configured.
-/// </summary>
 public sealed class AdminSeeder
 {
     private readonly IUserRepository _users;

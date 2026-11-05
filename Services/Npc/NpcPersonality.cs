@@ -2,10 +2,6 @@ using GeoConquest.Models.Domain;
 
 namespace GeoConquest.Services.Npc;
 
-/// <summary>
-/// Tuning values for each NPC profile (bonus feature: NPC profiles).
-/// Aggression, Caution and Greed are 0–100 weights; the odds values are probabilities.
-/// </summary>
 public sealed record NpcPersonality(
     NpcProfile Profile,
     string Title,

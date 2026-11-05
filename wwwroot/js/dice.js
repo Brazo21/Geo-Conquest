@@ -1,7 +1,3 @@
-// Animated 3-D dice. The server rolls the dice (so nobody can cheat from the browser);
-// this script only shows the result: each die tumbles through the air and lands on the
-// value the server sent. Any element <span class="cr-die" data-value="4"> becomes a cube;
-// elements that also carry class "roll" are animated, the rest are drawn at rest.
 (function () {
     'use strict';
 

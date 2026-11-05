@@ -2,10 +2,6 @@ using GeoConquest.Models.Domain;
 
 namespace GeoConquest.Services;
 
-/// <summary>
-/// A country a player can pick or be drawn against, with its real population.
-/// MapId is the ISO 3166-1 numeric code used by the world map; Lat/Lon place its pin.
-/// </summary>
 public sealed record CountryInfo(string Code, string Name, long Population, string MapId, double Lat, double Lon)
 {
     public int SoldierValue => Country.CalculateSoldierValue(Population);
@@ -18,11 +14,6 @@ public interface ICountryCatalog
     CountryInfo? Find(string code);
 }
 
-/// <summary>
-/// The selectable world. Populations are 2026 estimates from Worldometers
-/// (https://www.worldometers.info/world-population/population-by-country/,
-/// based on UN World Population Prospects 2024). Covers every soldier tier from 1 to 9.
-/// </summary>
 public sealed class StaticCountryCatalog : ICountryCatalog
 {
     private static readonly IReadOnlyList<CountryInfo> Countries = new List<CountryInfo>

@@ -2,13 +2,6 @@ using System.Security.Cryptography;
 
 namespace GeoConquest.Security;
 
-/// <summary>
-/// Adds security headers to every response:
-/// • Content-Security-Policy with a fresh per-request nonce: only our own scripts, scripts carrying the
-///   nonce, and two pinned CDNs can run, which blocks injected (XSS) scripts.
-/// • Clickjacking protection (frame-ancestors 'none' + X-Frame-Options), no MIME sniffing,
-///   a strict referrer policy and no access to camera/microphone/location.
-/// </summary>
 public sealed class SecurityHeadersMiddleware
 {
     public const string NonceKey = "csp-nonce";
@@ -54,17 +47,14 @@ public sealed class SecurityHeadersMiddleware
 
 public static class SecurityExtensions
 {
-    /// <summary>The nonce that inline &lt;script&gt; tags must carry to be allowed to run.</summary>
     public static string CspNonce(this HttpContext context) =>
         context.Items[SecurityHeadersMiddleware.NonceKey] as string ?? string.Empty;
 }
 
-/// <summary>Input checks shared by controllers (defence in depth on top of typed MongoDB filters).</summary>
 public static class InputGuard
 {
     public const int MaxSearchLength = 60;
 
-    /// <summary>Game ids are 32 lowercase hex characters (a GUID without dashes).</summary>
     public static bool IsGameId(string? id) =>
         id is { Length: 32 } && id.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f');
 

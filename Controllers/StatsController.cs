@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GeoConquest.Controllers;
 
-/// <summary>Leaderboard (public) and personal analytics with game replays (logged-in players). Thin: all maths is in the service.</summary>
 public sealed class StatsController : Controller
 {
     private readonly IAnalyticsService _analytics;

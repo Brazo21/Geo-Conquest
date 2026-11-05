@@ -31,7 +31,6 @@ public sealed class RegisterViewModel
     [Display(Name = "Confirm password")]
     public string ConfirmPassword { get; set; } = string.Empty;
 
-    /// <summary>POPIA consent. Must be ticked; the service checks it again.</summary>
     [MustBeTrue(ErrorMessage = "Please accept the privacy notice to create an account.")]
     [Display(Name = "I consent to the processing of my personal information")]
     public bool PopiaConsent { get; set; }
@@ -95,7 +94,6 @@ public sealed class ConsentViewModel
     public string? ReturnUrl { get; set; }
 }
 
-/// <summary>Everything we hold about the signed-in user (POPIA right of access).</summary>
 public sealed class MyDataViewModel
 {
     public string Username { get; init; } = string.Empty;
@@ -125,17 +123,12 @@ public sealed class DeleteMyAccountViewModel
     public string Confirm { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// A checkbox that must be ticked (consent). Checked on the server. [Range] is not used because jQuery's
-/// client-side range check treats "true" as a number and wrongly blocks ticked boxes.
-/// </summary>
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class MustBeTrueAttribute : ValidationAttribute
 {
     public override bool IsValid(object? value) => value is true;
 }
 
-/// <summary>Account security page: change password and change email, each confirmed with the current password.</summary>
 public sealed class SecurityViewModel
 {
     public string Username { get; set; } = string.Empty;

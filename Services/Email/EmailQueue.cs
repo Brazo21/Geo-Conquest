@@ -6,10 +6,8 @@ using Microsoft.Extensions.Options;
 
 namespace GeoConquest.Services.Email;
 
-/// <summary>An email waiting to be sent. Bodies are plain text (nothing to inject into).</summary>
 public sealed record EmailMessage(string To, string Subject, string Body);
 
-/// <summary>Queues emails so web requests never wait for the mail server.</summary>
 public interface IEmailQueue
 {
     bool IsConfigured { get; }
@@ -17,10 +15,6 @@ public interface IEmailQueue
     void Enqueue(EmailMessage message);
 }
 
-/// <summary>
-/// Bounded in-memory queue. Sending happens in <see cref="EmailSenderBackgroundService"/>, so the
-/// "forgot password" page answers in the same time whether or not the account exists.
-/// </summary>
 public sealed class EmailQueue : IEmailQueue
 {
     private readonly Channel<EmailMessage> _channel =
@@ -44,9 +38,6 @@ public sealed class EmailQueue : IEmailQueue
     }
 }
 
-/// <summary>
-/// Sends queued emails over SMTP or the Brevo HTTP API. Without settings it only logs that a message was due.
-/// </summary>
 public sealed class EmailSenderBackgroundService : BackgroundService
 {
     public const string BrevoClientName = "brevo";
@@ -118,7 +109,6 @@ public sealed class EmailSenderBackgroundService : BackgroundService
         }
     }
 
-    /// <summary>Brevo transactional email API (HTTPS, so it works where SMTP ports are blocked).</summary>
     private async Task SendWithBrevoAsync(EmailMessage message, CancellationToken ct)
     {
         var client = _http.CreateClient(BrevoClientName);
@@ -144,7 +134,6 @@ public sealed class EmailSenderBackgroundService : BackgroundService
         }
     }
 
-    /// <summary>Logs "ka***@gmail.com" rather than the full address (POPIA: minimum personal data in logs).</summary>
     private static string Mask(string email)
     {
         int at = email.IndexOf('@');

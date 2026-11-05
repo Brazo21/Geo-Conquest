@@ -1,10 +1,5 @@
 namespace GeoConquest.Models.Domain;
 
-/// <summary>
-/// A territory on the 10-country board. Embedded inside <see cref="GameSession"/>.
-/// All state is mutated only through intention-revealing methods, so a country
-/// can never go negative, change hands while defended, or be stripped below its garrison.
-/// </summary>
 public sealed class Country
 {
     public const int MinimumGarrison = 1;
@@ -25,20 +20,16 @@ public sealed class Country
         (150_000_000, 8)
     };
 
-    /// <summary>ISO 3166-1 alpha-2/3 code, unique within a game (e.g. "ZA").</summary>
     public string Code { get; private set; } = string.Empty;
 
     public string Name { get; private set; } = string.Empty;
 
     public long Population { get; private set; }
 
-    /// <summary>Fixed, population-derived value (1–9). Used for starting strength and conquest spoils.</summary>
     public int SoldierValue { get; private set; }
 
-    /// <summary>Soldiers currently stationed here. Changes during play.</summary>
     public int SoldierCount { get; private set; }
 
-    /// <summary>The <see cref="Player.PlayerId"/> of the current owner.</summary>
     public string OwnerId { get; private set; } = string.Empty;
 
     // Required by the MongoDB serializer; not usable by application code.
@@ -68,7 +59,6 @@ public sealed class Country
         };
     }
 
-    /// <summary>Maps a population to a soldier value using the brief's table.</summary>
     public static int CalculateSoldierValue(long population)
     {
         if (population <= 0)
@@ -88,13 +78,10 @@ public sealed class Country
 
     public bool IsDefeated() => SoldierCount == 0;
 
-    /// <summary>An attack needs at least 2 soldiers, because 1 must always stay home.</summary>
     public bool CanLaunchAttack() => SoldierCount >= MinimumAttackingStrength;
 
-    /// <summary>Soldiers that may fight (total minus the one that stays behind).</summary>
     public int GetAvailableAttackers() => Math.Max(0, SoldierCount - MinimumGarrison);
 
-    /// <summary>Spoils for conquering this country: Max(2, soldier value / 2), rounded down.</summary>
     public int GetConquestReward() => Math.Max(MinimumConquestReward, SoldierValue / 2);
 
     public void AddSoldiers(int amount)
@@ -105,7 +92,6 @@ public sealed class Country
         SoldierCount = checked(SoldierCount + amount);
     }
 
-    /// <summary>Removes battle casualties. May reach zero (the country is then defeated).</summary>
     public void RemoveSoldiers(int amount)
     {
         if (amount <= 0)
@@ -116,7 +102,6 @@ public sealed class Country
         SoldierCount -= amount;
     }
 
-    /// <summary>Hands the country to its conqueror. Only legal once its garrison has been wiped out.</summary>
     public void ChangeOwner(string newOwnerId)
     {
         if (string.IsNullOrWhiteSpace(newOwnerId))
@@ -129,7 +114,6 @@ public sealed class Country
         OwnerId = newOwnerId;
     }
 
-    /// <summary>Moves soldiers between two countries held by the same owner, keeping at least 1 behind.</summary>
     public void TransferSoldiersTo(Country destination, int amount)
     {
         ArgumentNullException.ThrowIfNull(destination);

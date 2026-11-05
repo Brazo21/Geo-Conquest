@@ -14,11 +14,6 @@ using Microsoft.Extensions.Options;
 
 namespace GeoConquest.Controllers;
 
-/// <summary>
-/// Sign-up, login, logout, POPIA consent, password reset and "your data". All rules live in <see cref="IAccountService"/>.
-/// No class-level [AllowAnonymous]: it would override the [Authorize] on the signed-in-only actions below.
-/// Pages without an attribute are open to everyone (the app has no fallback policy).
-/// </summary>
 public sealed class AccountController : Controller
 {
     private const string ServiceDownMessage =
@@ -47,7 +42,7 @@ public sealed class AccountController : Controller
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-    // ───────────────────────────── Sign up ─────────────────────────────
+    // Sign up
 
     [HttpGet]
     public IActionResult Register() =>
@@ -84,7 +79,7 @@ public sealed class AccountController : Controller
         }
     }
 
-    // ───────────────────────────── Log in / out ─────────────────────────────
+    // Log in / out
 
     [HttpGet]
     public IActionResult Login(string? returnUrl = null) =>
@@ -166,7 +161,7 @@ public sealed class AccountController : Controller
     [AllowWithoutConsent]
     public IActionResult AccessDenied() => View();
 
-    // ───────────────────────────── POPIA consent ─────────────────────────────
+    // POPIA consent
 
     [HttpGet]
     [Authorize]
@@ -200,7 +195,7 @@ public sealed class AccountController : Controller
         }
     }
 
-    // ───────────────────────────── Forgot / reset password ─────────────────────────────
+    // Forgot / reset password
 
     [HttpGet]
     public IActionResult ForgotPassword() => View(new ForgotPasswordViewModel());
@@ -280,7 +275,7 @@ public sealed class AccountController : Controller
         }
     }
 
-    // ───────────────────────────── Your data (POPIA access & erasure) ─────────────────────────────
+    // Your data (POPIA access & erasure)
 
     [HttpGet]
     [Authorize]
@@ -314,7 +309,7 @@ public sealed class AccountController : Controller
         }
     }
 
-    // ───────────────────────────── Account security (change password / email) ─────────────────────────────
+    // Account security (change password / email)
 
     [HttpGet]
     [Authorize]
@@ -370,9 +365,8 @@ public sealed class AccountController : Controller
         }
     }
 
-    // ───────────────────────────── helpers ─────────────────────────────
+    // helpers
 
-    /// <summary>Each form posts alone, so errors from the other (empty) form are dropped.</summary>
     private void ClearOtherForm(string prefix)
     {
         foreach (var key in ModelState.Keys.Where(k => k.StartsWith(prefix + ".", StringComparison.Ordinal)).ToList())

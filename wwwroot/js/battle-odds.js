@@ -1,4 +1,4 @@
-// Exact conquest odds — a browser copy of Services/BattleOddsCalculator.cs, used for the live
+// Exact conquest odds, a browser copy of Services/BattleOddsCalculator.cs, used for the live
 // "WIN ODDS" readout while choosing a target. The server recalculates everything itself.
 (function () {
     'use strict';
@@ -45,7 +45,7 @@
 
     window.battleOdds = { attackerWinProbability };
 
-    // ── Wire up the controls console, if present ──────────────────────────
+    // Wire up the controls console, if present
     document.addEventListener('DOMContentLoaded', () => {
         const from = document.getElementById('a-from');
         const to = document.getElementById('a-to');

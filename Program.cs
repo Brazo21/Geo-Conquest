@@ -58,14 +58,14 @@ builder.Services.AddSingleton<INpcStrategy, NpcStrategy>();
 builder.Services.AddScoped<IGameEngineService, GameEngineService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 
-// ── AI battle commentary (any OpenAI-compatible API; Gemini by default) ───────
+// AI battle commentary (any OpenAI-compatible API; Gemini by default)
 builder.Services
     .AddOptions<CommentarySettings>()
     .Bind(builder.Configuration.GetSection(CommentarySettings.SectionName));
 builder.Services.AddHttpClient(LlmCommentaryService.HttpClientName);
 builder.Services.AddSingleton<ICommentaryService, LlmCommentaryService>();
 
-// ── Accounts & security ───────────────────────────────────────────────────────
+// Accounts & security
 builder.Services.AddSingleton<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
@@ -77,22 +77,18 @@ builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<SessionStateCache>();
 builder.Services.AddScoped<AccountSessionValidator>();
 
-// ── Email (password resets): queued and sent in the background over SMTP ─────
+// Email (password resets): queued and sent in the background over SMTP
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection(EmailSettings.SectionName));
 builder.Services.AddSingleton<EmailQueue>();
 builder.Services.AddSingleton<IEmailQueue>(sp => sp.GetRequiredService<EmailQueue>());
 builder.Services.AddHostedService<EmailSenderBackgroundService>();
 builder.Services.AddHttpClient(EmailSenderBackgroundService.BrevoClientName, c => c.Timeout = TimeSpan.FromSeconds(20));
 
-// ── Cookie-encryption keys live in MongoDB, so restarts and redeploys don't log everyone out ──
+// Cookie-encryption keys live in MongoDB, so restarts and redeploys don't log everyone out
 builder.Services.AddDataProtection().SetApplicationName("GeoConquest");
 builder.Services.AddOptions<KeyManagementOptions>()
     .Configure<MongoDbContext>((options, db) => options.XmlRepository = new MongoXmlRepository(db.DataProtectionKeys));
 
-// ── Running behind a hosting proxy (Render sets RENDER=true) ──────────────────
-// The proxy ends HTTPS and forwards plain HTTP. Trusting its X-Forwarded-* headers lets the app see the
-// real scheme (secure cookies, HTTPS redirect) and the visitor's real IP (login rate limit). Only switched on
-// behind a proxy: an app open to the internet directly must not trust these headers, which anyone can fake.
 bool behindProxy = builder.Configuration.GetValue<bool>("BehindProxy") ||
                    string.Equals(Environment.GetEnvironmentVariable("RENDER"), "true", StringComparison.OrdinalIgnoreCase);
 if (behindProxy)
@@ -168,7 +164,7 @@ builder.Services
 
 var app = builder.Build();
 
-// ── Verify the Atlas connection and indexes before accepting traffic ─────────
+// Verify the Atlas connection and indexes before accepting traffic
 var mongo = app.Services.GetRequiredService<MongoDbContext>();
 try
 {
@@ -203,9 +199,6 @@ catch (Exception ex)
     throw;
 }
 
-// ── HTTP pipeline ─────────────────────────────────────────────────────────────
-// Friendly error pages everywhere: no stack traces or technical details ever reach the browser
-// (the full error is written to the log instead).
 if (behindProxy)
     app.UseForwardedHeaders();
 
@@ -228,9 +221,6 @@ app.UseAuthorization();
 // Health check for the host: answers fast and touches nothing personal.
 app.MapGet("/healthz", () => Results.Text("ok")).AllowAnonymous().DisableRateLimiting();
 
-// Android app (APK) built from this site with PWABuilder / Bubblewrap: this file proves the app and the site
-// belong together, so the app opens full screen without a browser bar. Values come from configuration
-// (Android:PackageName, Android:Sha256Fingerprints); until they are set the address returns 404.
 app.MapGet("/.well-known/assetlinks.json", (IConfiguration config) =>
 {
     string? package = config["Android:PackageName"];

@@ -1,16 +1,10 @@
 namespace GeoConquest.Models.Domain;
 
-/// <summary>
-/// One entry in a game's event log, embedded in the <see cref="GameSession"/> document.
-/// The log drives the live feed, the dice display, NPC "why" explanations, spectator
-/// polling (by <see cref="Sequence"/>) and, later, AI commentary and replays.
-/// </summary>
 public sealed class GameEvent
 {
     private List<int> _attackerDice = new();
     private List<int> _defenderDice = new();
 
-    /// <summary>1, 2, 3… in order. Clients ask for "everything after sequence N".</summary>
     public long Sequence { get; private set; }
 
     public int Round { get; private set; }
@@ -21,10 +15,8 @@ public sealed class GameEvent
 
     public string? ActorPlayerId { get; private set; }
 
-    /// <summary>What happened, ready to show in the event log.</summary>
     public string Message { get; private set; } = string.Empty;
 
-    /// <summary>For NPC actions: the one-sentence justification shown to the player.</summary>
     public string? Reasoning { get; private set; }
 
     public string? FromCountryCode { get; private set; }
@@ -35,19 +27,12 @@ public sealed class GameEvent
 
     public int? DefenderRemaining { get; private set; }
 
-    /// <summary>Attacker's chance of conquering (0–1) at this moment, if relevant.</summary>
     public double? WinOdds { get; private set; }
 
-    /// <summary>Battle commentary, attached after the event is recorded.</summary>
     public string? Commentary { get; private set; }
 
-    /// <summary>True when the commentary came from the LLM; false for the built-in fallback lines.</summary>
     public bool CommentaryIsAi { get; private set; }
 
-    /// <summary>
-    /// The whole board right after this event, as "CODE.playerIndex.soldiers" entries joined by commas
-    /// (e.g. "ZA.0.12,IN.3.4"). Lets the browser replay a turn step by step and rebuild the board at any point.
-    /// </summary>
     public string BoardSnapshot { get; private set; } = string.Empty;
 
     public IReadOnlyList<int> AttackerDice => _attackerDice.AsReadOnly();
@@ -112,7 +97,6 @@ public sealed class GameEvent
 
     public bool HasCommentary => !string.IsNullOrEmpty(Commentary);
 
-    /// <summary>Decodes <see cref="BoardSnapshot"/>: each country's code, owner (index into the game's players) and soldiers.</summary>
     public IReadOnlyList<BoardEntry> ReadBoard()
     {
         if (string.IsNullOrEmpty(BoardSnapshot))
@@ -129,12 +113,10 @@ public sealed class GameEvent
         return entries;
     }
 
-    /// <summary>Battle events get commentary; bookkeeping events (reinforcing, turn starts) do not.</summary>
     public bool IsBattleEvent => Type is GameEventType.AttackStarted or GameEventType.DiceRolled
         or GameEventType.CountryConquered or GameEventType.AttackFailed or GameEventType.AttackRetreated
         or GameEventType.PlayerEliminated or GameEventType.GameWon or GameEventType.GameLost;
 
-    /// <summary>Attaches commentary once. Commentary is limited to 400 characters.</summary>
     public void AttachCommentary(string commentary, bool isAi)
     {
         if (string.IsNullOrWhiteSpace(commentary))
@@ -160,5 +142,4 @@ public sealed class GameEvent
     }
 }
 
-/// <summary>One country in a board snapshot.</summary>
 public sealed record BoardEntry(string Code, int OwnerIndex, int Soldiers);

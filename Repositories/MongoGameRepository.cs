@@ -6,10 +6,6 @@ using MongoDB.Driver;
 
 namespace GeoConquest.Repositories;
 
-/// <summary>
-/// MongoDB implementation of <see cref="IGameRepository"/>. Each game is one document,
-/// so every operation is a single round-trip and is atomic at the document level.
-/// </summary>
 public sealed class MongoGameRepository : IGameRepository
 {
     private readonly IMongoCollection<GameSession> _games;

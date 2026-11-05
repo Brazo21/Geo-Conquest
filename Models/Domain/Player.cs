@@ -2,11 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace GeoConquest.Models.Domain;
 
-/// <summary>
-/// A seat in the game: the logged-in human or an NPC. Embedded inside <see cref="GameSession"/>.
-/// Territory is NOT stored here; ownership lives on <see cref="Country.OwnerId"/> so there is a
-/// single source of truth and the two can never drift apart.
-/// </summary>
 public sealed class Player
 {
     private static readonly Regex HexColor = new("^#[0-9A-Fa-f]{6}$", RegexOptions.Compiled);
@@ -17,15 +12,12 @@ public sealed class Player
 
     public PlayerType Type { get; private set; }
 
-    /// <summary>ASP.NET Identity user id for the human seat; null for NPCs.</summary>
     public string? UserId { get; private set; }
 
     public NpcProfile Profile { get; private set; }
 
-    /// <summary>Map/UI colour, e.g. "#3DDC84".</summary>
     public string ColorHex { get; private set; } = "#FFFFFF";
 
-    /// <summary>0-based position in the randomised turn order.</summary>
     public int TurnOrder { get; private set; }
 
     public bool IsEliminated { get; private set; }
@@ -71,7 +63,6 @@ public sealed class Player
 
     public bool IsHuman() => Type == PlayerType.Human;
 
-    /// <summary>True only for the human seat belonging to this authenticated user.</summary>
     public bool IsControlledBy(string? userId) =>
         IsHuman() && !string.IsNullOrEmpty(userId) && string.Equals(UserId, userId, StringComparison.Ordinal);
 

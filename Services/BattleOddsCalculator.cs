@@ -4,24 +4,9 @@ namespace GeoConquest.Services;
 
 public interface IBattleOddsCalculator
 {
-    /// <summary>
-    /// Probability (0–1) that an attacker with <paramref name="attackerSoldiers"/> in total
-    /// conquers a defender with <paramref name="defenderSoldiers"/>, if it keeps rolling until
-    /// the defender hits 0 or the attacker is down to 1.
-    /// </summary>
     double AttackerWinProbability(int attackerSoldiers, int defenderSoldiers);
 }
 
-/// <summary>
-/// Exact odds for GeoConquest's dice rules (not Risk's): each roll uses
-/// n = min(attacker − 1, defender) dice per side, dice are paired in order,
-/// higher die wins, ties change nothing. For one pair:
-///   P(attacker wins) = 15/36, P(defender wins) = 15/36, P(tie) = 6/36.
-/// A roll with k attacker losses, j defender losses and t ties has multinomial probability.
-/// The all-tie outcome returns to the same state, so it is divided out.
-/// Results are memoised; armies above <see cref="ExactLimit"/> are scaled down proportionally
-/// (for big armies the odds depend almost only on the ratio).
-/// </summary>
 public sealed class BattleOddsCalculator : IBattleOddsCalculator
 {
     private const int ExactLimit = 60;

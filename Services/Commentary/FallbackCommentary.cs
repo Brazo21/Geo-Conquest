@@ -2,10 +2,6 @@ using GeoConquest.Models.Domain;
 
 namespace GeoConquest.Services.Commentary;
 
-/// <summary>
-/// Hand-written commentary lines used when the AI is not configured, times out or fails.
-/// Varied by event sequence so repeated events don't read identically.
-/// </summary>
 public static class FallbackCommentary
 {
     private static readonly string[] Starts =

@@ -2,11 +2,6 @@ using GeoConquest.Models.Domain;
 
 namespace GeoConquest.Services.Npc;
 
-/// <summary>
-/// The shared NPC brain. Every NPC uses the same algorithm; the personality's weights
-/// change what it values. Steps: SCAN every attackable target, SCORE odds × spoils − risk,
-/// DECIDE against the personality's thresholds, EXPLAIN in one sentence.
-/// </summary>
 public sealed class NpcStrategy : INpcStrategy
 {
     private const int EliminationBonus = 3;
@@ -21,7 +16,7 @@ public sealed class NpcStrategy : INpcStrategy
         _odds = odds;
     }
 
-    // ───────────────────────────── Reinforcements ─────────────────────────────
+    // Reinforcements
 
     public IReadOnlyList<ReinforcementOrder> PlanReinforcements(GameSession session, Player npc)
     {
@@ -77,7 +72,7 @@ public sealed class NpcStrategy : INpcStrategy
             .AsReadOnly();
     }
 
-    // ───────────────────────────── Attack ─────────────────────────────
+    // Attack
 
     public AttackPlan ChooseAttack(GameSession session, Player npc)
     {
@@ -130,7 +125,7 @@ public sealed class NpcStrategy : INpcStrategy
                 $"Presses on against {defender.Name} at {odds:P0} odds.");
     }
 
-    // ───────────────────────────── Transfers ─────────────────────────────
+    // Transfers
 
     public TransferOrder? PlanPostConquestMove(GameSession session, Player npc, Country from, Country conquered)
     {
@@ -175,7 +170,7 @@ public sealed class NpcStrategy : INpcStrategy
             $"Moves {amount} from safer {donor.Name} to {target.Name}, which {targetThreat.Enemy.Name} threatens at {danger:P0}.");
     }
 
-    // ───────────────────────────── Alliances ─────────────────────────────
+    // Alliances
 
     public AllianceDecision ConsiderAlliance(GameSession session, Player npc, Player proposer)
     {
@@ -243,7 +238,7 @@ public sealed class NpcStrategy : INpcStrategy
     private static Player StrongestActive(GameSession session) =>
         session.GetActivePlayers().OrderByDescending(p => session.GetTotalSoldiers(p.PlayerId)).First();
 
-    // ───────────────────────────── Scoring ─────────────────────────────
+    // Scoring
 
     private sealed record StrikeOption(Country Source, Country Target, double Odds, double Score, bool EliminatesOwner, bool Revenge = false);
 
@@ -320,7 +315,6 @@ public sealed class NpcStrategy : INpcStrategy
             .OrderByDescending(t => t!.Odds)
             .FirstOrDefault();
 
-    /// <summary>The enemy country most likely to conquer <paramref name="country"/>, and its odds.</summary>
     private Threat? ThreatTo(GameSession session, Country country)
     {
         Threat? worst = null;

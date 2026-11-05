@@ -1,9 +1,5 @@
 namespace GeoConquest.Repositories;
 
-/// <summary>
-/// Raised when a game was modified by another request between load and save
-/// (e.g. a double-clicked "Roll" button or two open tabs). The caller should reload and retry.
-/// </summary>
 public sealed class ConcurrencyConflictException : Exception
 {
     public ConcurrencyConflictException(string gameId, long expectedVersion)

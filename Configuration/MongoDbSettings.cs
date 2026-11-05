@@ -2,11 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GeoConquest.Configuration;
 
-/// <summary>
-/// Strongly typed binding for the "MongoDb" section of appsettings.json.
-/// Validated at startup so a missing or malformed Atlas connection string fails fast
-/// with a clear message instead of on the first player request.
-/// </summary>
 public sealed class MongoDbSettings
 {
     public const string SectionName = "MongoDb";

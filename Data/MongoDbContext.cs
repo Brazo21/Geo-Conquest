@@ -6,11 +6,6 @@ using MongoDB.Driver;
 
 namespace GeoConquest.Data;
 
-/// <summary>
-/// Single access point to the Atlas database. Registered as a singleton because
-/// IMongoClient / IMongoCollection are thread-safe and pool their connections.
-/// Two collections: "games" (one document per game) and "users" (accounts).
-/// </summary>
 public sealed class MongoDbContext
 {
     private readonly IMongoDatabase _database;
@@ -30,14 +25,11 @@ public sealed class MongoDbContext
 
     public IMongoCollection<UserAccount> Users { get; }
 
-    /// <summary>Cookie-encryption keys, shared by every app instance and kept across restarts.</summary>
     public IMongoCollection<BsonDocument> DataProtectionKeys { get; }
 
-    /// <summary>Round-trips to Atlas; throws if the cluster is unreachable or credentials are wrong.</summary>
     public Task PingAsync(CancellationToken cancellationToken = default) =>
         _database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
 
-    /// <summary>Creates the indexes the app relies on. Safe to run on every startup.</summary>
     public async Task EnsureIndexesAsync(CancellationToken cancellationToken = default)
     {
         var gameKeys = Builders<GameSession>.IndexKeys;

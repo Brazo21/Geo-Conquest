@@ -52,7 +52,7 @@
         savedTimer = setTimeout(() => tag.classList.remove('show'), 1400);
     }
 
-    // ── Test buttons ───────────────────────────────────────────────────────
+    // Test buttons
     function rollPreview() {
         const box = $('#dice-preview');
         if (!box) return;

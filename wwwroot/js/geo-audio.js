@@ -1,10 +1,3 @@
-// GeoConquest sound engine. Every sound is synthesised with the Web Audio API, so there are no
-// audio files to download, nothing for the Content-Security-Policy to allow, and no copyright worries.
-//   • music:   a quiet war-room loop (Am–F–C–G) with a radar blip
-//   • effects: clicks, dice rattle, duel results, conquest, alarms, victory and defeat fanfares
-//   • haptics: navigator.vibrate patterns for wins and losses (Android; iPhones ignore vibration)
-// Browsers only allow sound after the player has touched the page, so the engine unlocks on the
-// first click / tap / key press and shows a small hint if it is still waiting.
 (function () {
     'use strict';
 
@@ -48,7 +41,7 @@
         fxBus.gain.setTargetAtTime(s.effects / 100, t, k);
     }
 
-    // ── Building blocks ────────────────────────────────────────────────────
+    // Building blocks
     function tone({ freq, type = 'square', dur = 0.15, vol = 0.2, at = 0, when = null, slide = null, attack = 0.005, bus = null }) {
         if (!ensure()) return;
         const t = when ?? (ctx.currentTime + at);
@@ -89,7 +82,7 @@
         });
     }
 
-    // ── Sound effects ──────────────────────────────────────────────────────
+    // Sound effects
     const SFX = {
         click: () => tone({ freq: 1100, type: 'square', dur: 0.035, vol: 0.05 }),
         toggle: () => { tone({ freq: 700, dur: 0.04, vol: 0.06 }); tone({ freq: 1050, dur: 0.04, vol: 0.06, at: 0.05 }); },
@@ -127,7 +120,7 @@
         talk: () => tone({ freq: 220 + Math.random() * 160, type: 'square', dur: 0.035, vol: 0.035 })
     };
 
-    // ── Haptics ────────────────────────────────────────────────────────────
+    // Haptics
     const VIBES = {
         tap: [15],
         turn: [40, 60, 40],
@@ -144,7 +137,7 @@
         try { return navigator.vibrate(VIBES[name] || VIBES.tap); } catch { return false; }
     }
 
-    // ── Music: a lookahead scheduler keeps the beat steady even when the tab is busy ──
+    // Music: a lookahead scheduler keeps the beat steady even when the tab is busy
     const BPM = 76, STEP = 60 / BPM / 2;
     const CHORDS = [[45, 57, 60, 64], [41, 53, 57, 60], [48, 55, 60, 64], [43, 55, 59, 62]];
     const ARP = [1, 2, 3, 2, 1, 3, 2, 3];
@@ -178,7 +171,7 @@
         musicTimer = null;
     }
 
-    // ── Unlocking (browser autoplay rules) ─────────────────────────────────
+    // Unlocking (browser autoplay rules)
     let hint = null;
     function showHint(show) {
         if (show && !hint && settings().sound) {

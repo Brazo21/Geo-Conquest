@@ -1,28 +1,19 @@
 namespace GeoConquest.Models.Domain;
 
-/// <summary>
-/// A pact between two commanders, embedded in the <see cref="GameSession"/> document.
-/// Allies cannot attack each other. A pact lasts <see cref="GameSession.AllianceLengthRounds"/> full rounds,
-/// unless one side breaks it (a betrayal the other side remembers) or one side is eliminated.
-/// Only the GameSession aggregate may create or change an alliance.
-/// </summary>
 public sealed class Alliance
 {
     public string Id { get; private set; } = string.Empty;
 
-    /// <summary>The commander who proposed the pact.</summary>
     public string PlayerAId { get; private set; } = string.Empty;
 
     public string PlayerBId { get; private set; } = string.Empty;
 
     public int FormedInRound { get; private set; }
 
-    /// <summary>The pact holds up to and including this round.</summary>
     public int ExpiresAfterRound { get; private set; }
 
     public AllianceStatus Status { get; private set; }
 
-    /// <summary>Who broke the pact early (a betrayal); null otherwise.</summary>
     public string? BrokenByPlayerId { get; private set; }
 
     public int? EndedInRound { get; private set; }
@@ -77,7 +68,6 @@ public sealed class Alliance
         EndedInRound = round;
     }
 
-    /// <summary>A member was eliminated: the pact simply ends.</summary>
     internal void End(int round)
     {
         EnsureActive();

@@ -2,10 +2,6 @@ using GeoConquest.Models.Domain;
 
 namespace GeoConquest.Models.ViewModels;
 
-/// <summary>
-/// JSON returned by GET /game/{id}/events?after=N. The browser uses it to replay turns step by step
-/// (with fast-forward) and spectators poll it to follow a game live. Read-only and safe for anyone.
-/// </summary>
 public sealed record GameFeedDto(
     string GameId,
     GameStatus Status,

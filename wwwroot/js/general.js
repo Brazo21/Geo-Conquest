@@ -1,7 +1,3 @@
-// The General: an animated avatar who stands for the player. He reacts to the game as it
-// unfolds: salutes when it is your turn, points when you attack, cheers when you conquer,
-// slumps when you lose ground, and says a short line in a speech bubble.
-// Mount point: <div class="cr-general" data-general data-name="…" style="--pc:#3ddc84"></div>
 (function () {
     'use strict';
 

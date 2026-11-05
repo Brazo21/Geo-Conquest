@@ -13,11 +13,6 @@ public interface IAnalyticsService
         CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Leaderboard, personal analytics and replays, all computed from the stored games
-/// (no separate stats collection to keep in sync). Board snapshots on each event make
-/// replays and "territory over time" possible.
-/// </summary>
 public sealed class AnalyticsService : IAnalyticsService
 {
     private const int LeaderboardSize = 50;
@@ -32,7 +27,7 @@ public sealed class AnalyticsService : IAnalyticsService
         _catalog = catalog;
     }
 
-    // ═════════════════════════════ Leaderboard ═════════════════════════════
+    // Leaderboard
 
     public async Task<LeaderboardViewModel> GetLeaderboardAsync(string tab, string? userId, CancellationToken cancellationToken = default)
     {
@@ -157,7 +152,7 @@ public sealed class AnalyticsService : IAnalyticsService
             .Take(8)
             .ToList();
 
-    // ═════════════════════════════ Personal analytics ═════════════════════════════
+    // Personal analytics
 
     public async Task<AnalyticsViewModel> GetAnalyticsAsync(string userId, string commander, string? replayGameId, string tab,
         CancellationToken cancellationToken = default)
@@ -345,7 +340,7 @@ public sealed class AnalyticsService : IAnalyticsService
             })
             .ToList();
 
-    // ═════════════════════════════ Helpers ═════════════════════════════
+    // Helpers
 
     private sealed record GameFacts(
         string GameId, string UserId, string Commander, bool Finished, bool Won, int Rounds,

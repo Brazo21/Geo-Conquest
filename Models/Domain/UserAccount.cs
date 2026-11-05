@@ -3,24 +3,17 @@ using System.Text.RegularExpressions;
 
 namespace GeoConquest.Models.Domain;
 
-/// <summary>Whether an account may log in.</summary>
 public enum AccountStatus
 {
     Active,
     Suspended
 }
 
-/// <summary>
-/// A registered commander. Stored in its own "users" collection (accounts outlive games).
-/// The password is never stored, only a salted PBKDF2 hash produced by ASP.NET Core's PasswordHasher.
-/// Every change goes through a method that checks the rules, so the stored state is always valid.
-/// </summary>
 public sealed class UserAccount
 {
     public const string PlayerRole = "Player";
     public const string AdminRole = "Admin";
 
-    /// <summary>Version of the POPIA privacy notice. Raising it asks every user to consent again.</summary>
     public const string CurrentConsentVersion = "2026-11";
 
     private static readonly Regex UsernamePattern = new("^[A-Za-z0-9_]{3,20}$", RegexOptions.Compiled);
@@ -30,7 +23,6 @@ public sealed class UserAccount
 
     public string Username { get; private set; } = string.Empty;
 
-    /// <summary>Upper-cased copy used for case-insensitive, uniquely indexed lookups.</summary>
     public string NormalizedUsername { get; private set; } = string.Empty;
 
     public string Email { get; private set; } = string.Empty;
@@ -41,14 +33,13 @@ public sealed class UserAccount
 
     public string PasswordHash { get; private set; } = string.Empty;
 
-    /// <summary>Player, or Admin (admins can also play).</summary>
     public string Role { get; private set; } = PlayerRole;
 
     public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime? LastLoginAtUtc { get; private set; }
 
-    // ── Status (admin control) ──────────────────────────────────────────────
+    // Status (admin control)
     public AccountStatus Status { get; private set; } = AccountStatus.Active;
 
     public DateTime? SuspendedAtUtc { get; private set; }
@@ -57,18 +48,14 @@ public sealed class UserAccount
 
     public string? SuspendedBy { get; private set; }
 
-    /// <summary>
-    /// Changes whenever the password, role or status changes. The sign-in cookie carries a copy;
-    /// when they no longer match, the cookie is rejected, so old sessions end straight away.
-    /// </summary>
     public string SecurityStamp { get; private set; } = string.Empty;
 
-    // ── POPIA consent ───────────────────────────────────────────────────────
+    // POPIA consent
     public string? ConsentVersion { get; private set; }
 
     public DateTime? ConsentGivenAtUtc { get; private set; }
 
-    // ── Password reset (only a hash of the emailed token is stored) ─────────
+    // Password reset (only a hash of the emailed token is stored)
     public string? PasswordResetTokenHash { get; private set; }
 
     public DateTime? PasswordResetExpiresUtc { get; private set; }
@@ -118,7 +105,6 @@ public sealed class UserAccount
 
     private static string NewStamp() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 
-    /// <summary>Accounts created before security stamps existed get one on their next login.</summary>
     public bool EnsureSecurityStamp()
     {
         if (!string.IsNullOrEmpty(SecurityStamp))
@@ -127,7 +113,6 @@ public sealed class UserAccount
         return true;
     }
 
-    /// <summary>Stores a hash produced by the password hasher (never a plain-text password).</summary>
     public void SetPasswordHash(string passwordHash)
     {
         if (string.IsNullOrWhiteSpace(passwordHash))
@@ -138,18 +123,16 @@ public sealed class UserAccount
 
     public void RecordLogin() => LastLoginAtUtc = DateTime.UtcNow;
 
-    // ── POPIA ───────────────────────────────────────────────────────────────
+    // POPIA
 
-    /// <summary>Records that the user accepted the current privacy notice.</summary>
     public void RecordConsent()
     {
         ConsentVersion = CurrentConsentVersion;
         ConsentGivenAtUtc = DateTime.UtcNow;
     }
 
-    // ── Password reset ──────────────────────────────────────────────────────
+    // Password reset
 
-    /// <summary>Starts a reset: stores the token's hash and when it expires. A new request replaces the old token.</summary>
     public void BeginPasswordReset(string tokenHash, TimeSpan lifetime)
     {
         if (string.IsNullOrWhiteSpace(tokenHash))
@@ -161,7 +144,6 @@ public sealed class UserAccount
         PasswordResetExpiresUtc = DateTime.UtcNow.Add(lifetime);
     }
 
-    /// <summary>True if this token hash matches the stored one and has not expired. Compared in constant time.</summary>
     public bool IsPasswordResetValid(string tokenHash)
     {
         if (string.IsNullOrEmpty(PasswordResetTokenHash) || PasswordResetExpiresUtc is null ||
@@ -173,7 +155,6 @@ public sealed class UserAccount
         return stored.Length == given.Length && CryptographicOperations.FixedTimeEquals(stored, given);
     }
 
-    /// <summary>Sets the new password, uses up the token and signs the user out everywhere.</summary>
     public void CompletePasswordReset(string newPasswordHash)
     {
         SetPasswordHash(newPasswordHash);
@@ -183,12 +164,10 @@ public sealed class UserAccount
         SecurityStamp = NewStamp();
     }
 
-    // ── Self-service changes (Account security page) ───────────────────────
+    // Self-service changes (Account security page)
 
-    /// <summary>The user chose a new password while signed in. Ends their other sessions.</summary>
     public void ChangePassword(string newPasswordHash) => CompletePasswordReset(newPasswordHash);
 
-    /// <summary>Changes the email used for login and reset links. Uniqueness is checked by the service and the unique index.</summary>
     public void ChangeEmail(string email)
     {
         email = (email ?? string.Empty).Trim();
@@ -203,7 +182,7 @@ public sealed class UserAccount
         PasswordResetExpiresUtc = null;
     }
 
-    // ── Admin control ───────────────────────────────────────────────────────
+    // Admin control
 
     public void Suspend(string reason, string byUsername)
     {

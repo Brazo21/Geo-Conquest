@@ -1,6 +1,3 @@
-// World map for the command room: real country shapes (Natural Earth via world-atlas),
-// game countries filled in their owner's colour, and a pin per country showing its soldiers.
-// Clicking an enemy pin picks it as the attack target. If the map data can't load, pins still draw.
 (function () {
     'use strict';
 

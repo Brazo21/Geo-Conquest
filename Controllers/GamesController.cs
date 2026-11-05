@@ -10,11 +10,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace GeoConquest.Controllers;
 
-/// <summary>
-/// Thin controller: reads input, calls the engine, picks a view. No game rules here.
-/// Watching (lists, the board) is open to everyone; every move requires a logged-in Player,
-/// and the engine additionally checks that the player owns the game and that it is their turn.
-/// </summary>
 public sealed class GamesController : Controller
 {
     private readonly IGameEngineService _engine;
@@ -30,7 +25,7 @@ public sealed class GamesController : Controller
 
     private string? CurrentUserId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
-    // ───────────────────────────── Lists (anyone) ─────────────────────────────
+    // Lists (anyone)
 
     [HttpGet]
     [AllowAnonymous]
@@ -64,9 +59,8 @@ public sealed class GamesController : Controller
         });
     }
 
-    // ───────────────────────────── Watch (anyone) ─────────────────────────────
+    // Watch (anyone)
 
-    /// <summary>The shareable game page, e.g. /game/abc123. Visitors see everything but get no controls.</summary>
     [HttpGet("/game/{id}")]
     [AllowAnonymous]
     public async Task<IActionResult> Play(string id, long? replay, CancellationToken cancellationToken)
@@ -99,7 +93,6 @@ public sealed class GamesController : Controller
         }
     }
 
-    /// <summary>Live feed: events after a sequence number, each with commentary and a board snapshot.</summary>
     [HttpGet("/game/{id}/events")]
     [AllowAnonymous]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
@@ -120,7 +113,7 @@ public sealed class GamesController : Controller
         }
     }
 
-    // ───────────────────────────── Start a game (players) ─────────────────────────────
+    // Start a game (players)
 
     [HttpGet]
     [Authorize(Roles = UserAccount.PlayerRole)]
@@ -148,7 +141,7 @@ public sealed class GamesController : Controller
         }
     }
 
-    // ───────────────────────────── Moves (owner, on their turn) ─────────────────────────────
+    // Moves (owner, on their turn)
 
     [HttpPost]
     [Authorize(Roles = UserAccount.PlayerRole)]
@@ -198,7 +191,6 @@ public sealed class GamesController : Controller
     public Task<IActionResult> BreakAlliance(string id, CancellationToken ct) =>
         ExecuteMoveAsync(id, userId => _engine.BreakAllianceAsync(id, userId, ct));
 
-    /// <summary>Runs one move and turns rule violations into a friendly message on the game page.</summary>
     private async Task<IActionResult> ExecuteMoveAsync(string id, Func<string, Task<MoveOutcome>> move)
     {
         if (!InputGuard.IsGameId(id))

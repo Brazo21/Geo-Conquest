@@ -1,7 +1,3 @@
-// Player preferences (sound, vibration, brightness, dice, general…).
-// Kept on this device in localStorage: they describe the screen and speakers in front of the player,
-// not the game, so they need no server round-trip and also work for spectators.
-// Every value is validated on load, so a hand-edited or corrupted entry can never break the page.
 (function () {
     'use strict';
 

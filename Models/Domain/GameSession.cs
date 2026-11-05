@@ -1,21 +1,11 @@
 namespace GeoConquest.Models.Domain;
 
-/// <summary>
-/// Aggregate root: the ENTIRE state of one game, stored as a single MongoDB document
-/// (players and countries are embedded). One read loads a game; one write saves it.
-///
-/// Responsibility split:
-///  • GameSession guards invariants (whose turn it is, what phase allows what, no soldiers
-///    created or destroyed by accident).
-///  • GameEngineService (Phase 2) owns the rules that DECIDE outcomes: dice, battle resolution,
-///    reinforcement maths, NPC strategy. It calls these methods to apply its decisions.
-/// </summary>
+// The whole game in one MongoDB document. Methods here guard the rules; GameEngineService decides outcomes.
 public sealed class GameSession
 {
     public const int BoardSize = 10;
     public const int MinimumPlayers = 2;
 
-    /// <summary>An alliance holds for the rest of the round it is made in, plus this many full rounds.</summary>
     public const int AllianceLengthRounds = 3;
 
     // Mapped explicitly as "players" / "countries" in MongoMappings; never exposed as mutable lists.
@@ -26,41 +16,30 @@ public sealed class GameSession
 
     public string Id { get; private set; } = string.Empty;
 
-    /// <summary>Identity user id of the account that created (and alone may play) this game.</summary>
     public string OwnerUserId { get; private set; } = string.Empty;
 
     public GameStatus Status { get; private set; }
 
-    /// <summary>Starts at 1. Reinforcements are granted from round 2 onward.</summary>
     public int Round { get; private set; }
 
     public string? CurrentPlayerId { get; private set; }
 
     public TurnPhase Phase { get; private set; }
 
-    /// <summary>Reinforcements granted this turn that have not yet been placed.</summary>
     public int PendingReinforcements { get; private set; }
 
-    /// <summary>One attack per turn.</summary>
     public bool AttackUsedThisTurn { get; private set; }
 
-    /// <summary>One alliance proposal per turn, so a player can't spam every NPC until one says yes.</summary>
     public bool AllianceProposedThisTurn { get; private set; }
 
-    /// <summary>
-    /// When the human last acted (or their turn began). Anti-cheat: a battle or turn left idle too long
-    /// is resolved by the server, so closing the browser mid-attack never freezes or undoes anything.
-    /// </summary>
     public DateTime? LastHumanActivityUtc { get; private set; }
 
-    /// <summary>Set while a multi-roll attack is in progress, so it survives across HTTP requests.</summary>
     public string? ActiveAttackerCode { get; private set; }
 
     public string? ActiveDefenderCode { get; private set; }
 
     public string? WinnerPlayerId { get; private set; }
 
-    /// <summary>The country the human chose at the start (used by the leaderboard and analytics).</summary>
     public string? StartingCountryCode { get; private set; }
 
     public DateTime CreatedAtUtc { get; private set; }
@@ -69,10 +48,8 @@ public sealed class GameSession
 
     public DateTime? CompletedAtUtc { get; private set; }
 
-    /// <summary>Optimistic-concurrency token, incremented on every save by the repository.</summary>
     public long Version { get; private set; }
 
-    /// <summary>Sequence number of the newest event. Spectators poll for events after this.</summary>
     public long LastEventSequence { get; private set; }
 
     public IReadOnlyList<Player> Players => _players.AsReadOnly();
@@ -88,7 +65,7 @@ public sealed class GameSession
     {
     }
 
-    // ───────────────────────────── Creation ─────────────────────────────
+    // Creation
 
     public static GameSession Create(string ownerUserId, IEnumerable<Player> players, IEnumerable<Country> countries)
     {
@@ -137,10 +114,6 @@ public sealed class GameSession
         };
     }
 
-    /// <summary>
-    /// Starts play using a turn order decided (randomly) by the engine.
-    /// The first player in the order moves first; round 1 has no reinforcements.
-    /// </summary>
     public void Start(IReadOnlyList<string> turnOrderPlayerIds)
     {
         if (Status != GameStatus.Setup)
@@ -162,7 +135,7 @@ public sealed class GameSession
         ResetTurnState();
     }
 
-    // ───────────────────────────── Queries ─────────────────────────────
+    // Queries
 
     public bool IsOwnedBy(string? userId) =>
         !string.IsNullOrEmpty(userId) && string.Equals(OwnerUserId, userId, StringComparison.Ordinal);
@@ -191,10 +164,6 @@ public sealed class GameSession
     public IReadOnlyList<Player> GetActivePlayers() =>
         _players.Where(p => !p.IsEliminated).OrderBy(p => p.TurnOrder).ToList().AsReadOnly();
 
-    /// <summary>
-    /// The human's starting country. Games created before this was stored recover it from the
-    /// first event's board snapshot.
-    /// </summary>
     public string? GetStartingCountryCode()
     {
         if (StartingCountryCode is not null)
@@ -210,7 +179,7 @@ public sealed class GameSession
     public int GetTotalSoldiers(string playerId) =>
         _countries.Where(c => c.IsOwnedBy(playerId)).Sum(c => c.SoldierCount);
 
-    // ───────────────────────────── Alliances: queries ─────────────────────────────
+    // Alliances: queries
 
     public Alliance? GetActiveAlliance(string playerId) =>
         _alliances.FirstOrDefault(a => a.IsActive && a.Includes(playerId));
@@ -219,20 +188,17 @@ public sealed class GameSession
         playerAId != playerBId &&
         _alliances.Any(a => a.IsActive && a.Includes(playerAId) && a.Includes(playerBId));
 
-    /// <summary>True if <paramref name="betrayerId"/> once broke an alliance with <paramref name="victimId"/>.</summary>
     public bool HasBetrayed(string betrayerId, string victimId) =>
         _alliances.Any(a => a.Status == AllianceStatus.Broken && a.BrokenByPlayerId == betrayerId && a.Includes(victimId));
 
-    /// <summary>True when this authenticated user may act right now (it is their human seat's turn).</summary>
     public bool CanUserAct(string? userId) =>
         Status == GameStatus.InProgress &&
         IsOwnedBy(userId) &&
         CurrentPlayerId is not null &&
         GetCurrentPlayer().IsControlledBy(userId);
 
-    // ───────────────────────────── Turn flow ─────────────────────────────
+    // Turn flow
 
-    /// <summary>Records reinforcements calculated by the engine (2 per country from round 2).</summary>
     public void GrantReinforcements(int amount)
     {
         EnsureInProgress();
@@ -245,7 +211,6 @@ public sealed class GameSession
         Phase = amount > 0 ? TurnPhase.Reinforcement : TurnPhase.Action;
     }
 
-    /// <summary>Places some of this turn's reinforcements on a country the current player owns.</summary>
     public void PlaceReinforcements(string playerId, string countryCode, int amount)
     {
         EnsureCurrentPlayer(playerId);
@@ -265,7 +230,6 @@ public sealed class GameSession
             Phase = TurnPhase.Action;
     }
 
-    /// <summary>Moves soldiers between two of the current player's countries (not during an attack).</summary>
     public void TransferSoldiers(string playerId, string fromCode, string toCode, int amount)
     {
         EnsureCurrentPlayer(playerId);
@@ -281,7 +245,6 @@ public sealed class GameSession
         from.TransferSoldiersTo(GetCountry(toCode), amount);
     }
 
-    /// <summary>Opens the turn's single attack. Dice are rolled by the engine.</summary>
     public void BeginAttack(string playerId, string attackerCode, string defenderCode)
     {
         EnsureCurrentPlayer(playerId);
@@ -320,7 +283,6 @@ public sealed class GameSession
     public Country GetActiveDefender() =>
         ActiveDefenderCode is null ? throw new DomainException("No attack is in progress.") : GetCountry(ActiveDefenderCode);
 
-    /// <summary>Closes the attack (conquest, failure or retreat). Transfers become available again.</summary>
     public void EndAttack()
     {
         EnsureInProgress();
@@ -332,10 +294,6 @@ public sealed class GameSession
         Phase = TurnPhase.Action;
     }
 
-    /// <summary>
-    /// Passes the turn to the next non-eliminated player in turn order.
-    /// The round counter advances each time play wraps back to the start of the order.
-    /// </summary>
     public Player AdvanceTurn()
     {
         EnsureInProgress();
@@ -363,9 +321,8 @@ public sealed class GameSession
         throw new DomainException("No active players remain.");
     }
 
-    // ───────────────────────────── Alliances: commands ─────────────────────────────
+    // Alliances: commands
 
-    /// <summary>Uses up the current player's one alliance proposal for this turn.</summary>
     public void RecordAllianceProposal(string proposerId)
     {
         EnsureCurrentPlayer(proposerId);
@@ -377,7 +334,6 @@ public sealed class GameSession
         AllianceProposedThisTurn = true;
     }
 
-    /// <summary>Seals a pact the partner has agreed to (the engine and NPC brain decide whether they agree).</summary>
     public Alliance FormAlliance(string proposerId, string partnerId)
     {
         EnsureCurrentPlayer(proposerId);
@@ -402,7 +358,6 @@ public sealed class GameSession
         return alliance;
     }
 
-    /// <summary>Breaks the current player's pact early. The other side will remember the betrayal.</summary>
     public Alliance BreakAlliance(string playerId)
     {
         EnsureCurrentPlayer(playerId);
@@ -414,7 +369,6 @@ public sealed class GameSession
         return alliance;
     }
 
-    /// <summary>Ends pacts whose time is up. The engine logs each one.</summary>
     public IReadOnlyList<Alliance> ExpireAlliances()
     {
         var due = _alliances.Where(a => a.IsActive && Round > a.ExpiresAfterRound).ToList();
@@ -423,15 +377,13 @@ public sealed class GameSession
         return due.AsReadOnly();
     }
 
-    // ───────────────────────────── Anti-cheat: activity clock ─────────────────────────────
+    // Anti-cheat: activity clock
 
-    /// <summary>Called by the engine whenever the human acts or their turn begins.</summary>
     public void MarkHumanActivity(DateTime utcNow) => LastHumanActivityUtc = utcNow;
 
-    /// <summary>How long the human has been idle (older games without the clock use the last save time).</summary>
     public TimeSpan HumanIdleFor(DateTime utcNow) => utcNow - (LastHumanActivityUtc ?? UpdatedAtUtc);
 
-    // ───────────────────────────── End conditions ─────────────────────────────
+    // End conditions
 
     public void EliminatePlayer(string playerId)
     {
@@ -460,7 +412,6 @@ public sealed class GameSession
         ActiveDefenderCode = null;
     }
 
-    /// <summary>Ends a single-player game in defeat once the human has lost every country.</summary>
     public void ConcludeWithHumanDefeat()
     {
         EnsureInProgress();
@@ -487,9 +438,8 @@ public sealed class GameSession
         Phase = TurnPhase.NotStarted;
     }
 
-    // ───────────────────────────── Event log ─────────────────────────────
+    // Event log
 
-    /// <summary>Appends an event, stamping it with the next sequence number, the round and the time.</summary>
     public GameEvent AppendEvent(GameEvent gameEvent)
     {
         ArgumentNullException.ThrowIfNull(gameEvent);
@@ -500,25 +450,22 @@ public sealed class GameSession
         return gameEvent;
     }
 
-    /// <summary>Compact snapshot of every country: "CODE.playerIndex.soldiers", comma-separated.</summary>
     private string CaptureBoard() =>
         string.Join(',', _countries.Select(c =>
             $"{c.Code}.{_players.FindIndex(p => p.PlayerId == c.OwnerId)}.{c.SoldierCount}"));
 
-    /// <summary>Events newer than <paramref name="sequence"/>, oldest first (used by live polling).</summary>
     public IReadOnlyList<GameEvent> GetEventsSince(long sequence) =>
         _events.Where(e => e.Sequence > sequence).OrderBy(e => e.Sequence).ToList().AsReadOnly();
 
-    // ───────────────────────────── Persistence hook ─────────────────────────────
+    // Persistence hook
 
-    /// <summary>Called only by the repository immediately before a write.</summary>
     internal void MarkSaved()
     {
         Version++;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
-    // ───────────────────────────── Guards ─────────────────────────────
+    // Guards
 
     private void ResetTurnState()
     {

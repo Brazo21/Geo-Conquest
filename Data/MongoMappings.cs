@@ -5,11 +5,6 @@ using MongoDB.Bson.Serialization.Conventions;
 
 namespace GeoConquest.Data;
 
-/// <summary>
-/// All BSON mapping lives here, so the domain classes stay free of MongoDB attributes
-/// (database concerns are kept separate from the rest of the application).
-/// Must be called once, before the first collection is used.
-/// </summary>
 public static class MongoMappings
 {
     private static int _registered;
