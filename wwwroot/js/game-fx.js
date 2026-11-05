@@ -41,6 +41,14 @@
         setTimeout(() => fx.remove(), 4600);
     }
 
+    // ── Anti-cheat: warn before leaving in the middle of your own battle ──
+    // The battle is saved on the server either way; leaving for 5+ minutes counts as a retreat.
+    if (cfg.guardLeave && !cfg.isSpectator) {
+        const warn = ev => { ev.preventDefault(); ev.returnValue = ''; };
+        window.addEventListener('beforeunload', warn);
+        document.addEventListener('submit', () => window.removeEventListener('beforeunload', warn), true);
+    }
+
     // ── Event reactions ────────────────────────────────────────────────────
     window.addEventListener('geo:event', ({ detail }) => {
         const { e, actor, prevOwnerId } = detail;
@@ -117,6 +125,35 @@
                     G('defeat', 'It is over, Commander…', { hold: true });
                     overlay('defeat', 'Defeat');
                 }
+                break;
+
+            case 'AllianceFormed':
+                if (mine || e.message.includes(cfg.players.find(p => p.isHuman)?.name ?? '\u0000')) {
+                    A()?.play('defended'); buzz('conquer');
+                    G('cheer', 'Alliance sealed. Watch their borders, not ours.');
+                } else {
+                    A()?.play('alarm');
+                    G('alarm', 'Two generals have teamed up. Careful, Commander.', { minor: true });
+                }
+                break;
+
+            case 'AllianceRejected':
+                A()?.play('attackFailed');
+                G('sad', 'They turned us down. Their loss.', { minor: true });
+                break;
+
+            case 'AllianceBroken':
+                A()?.play('alarm');
+                if (mine) G('order', 'No more friends. Strike while they reel!');
+                break;
+
+            case 'AllianceExpired':
+                A()?.play('npcMove');
+                break;
+
+            case 'TurnTimedOut':
+                A()?.play('alarm'); buzz('alarm');
+                G('sad', 'We were away too long. The turn has passed.');
                 break;
 
             case 'GameLost':

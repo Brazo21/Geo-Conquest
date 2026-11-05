@@ -45,6 +45,7 @@
         outcome = Model.Status == GameStatus.Completed ? (Model.OutcomeMessage?.StartsWith("Victory") == true ? "won" : "lost") : null,
         humanId = human.Id,
         battle = Model.Battle is null ? null : new { from = Model.Battle.Attacker.Code, to = Model.Battle.Defender.Code },
+        guardLeave = Model.Battle is not null && Model.CanAct,
         players = Model.Players.Select(p => new { id = p.Id, name = p.Name, color = p.Color, isHuman = p.IsHuman, tag = Tag(p) }),
         countries = Model.Countries.Select(c => new
         {
@@ -319,6 +320,53 @@ else
                 </div>
             </div>
 
+            <div class="cr-panel" id="alliances">
+                <div class="cr-label"><span>Alliances</span><span class="hint">@GameSession.AllianceLengthRounds rounds · allies can't attack each other</span></div>
+                @if (!Model.Alliances.Any())
+                {
+                    <p class="small cr-muted mb-2">No pacts on the board.</p>
+                }
+                else
+                {
+                    <ul class="cr-pacts">
+                        @foreach (var a in Model.Alliances)
+                        {
+                            <li class="@(a.InvolvesHuman ? "mine" : "")">
+                                <span><span class="cr-swatch" style="background:@a.FirstColor"></span>@(a.FirstName.Split(" · ")[0])</span>
+                                <span class="cr-muted">+</span>
+                                <span><span class="cr-swatch" style="background:@a.SecondColor"></span>@(a.SecondName.Split(" · ")[0])</span>
+                                <span class="until">to R@(a.UntilRound)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                @if (Model.CanBreakAlliance)
+                {
+                    <form asp-action="BreakAlliance" asp-route-id="@Model.GameId" method="post" class="mt-2" data-confirm="Break the alliance? Your ally will never trust you again and will target you first.">
+                        <button type="submit" class="cr-btn sm w-100">Break alliance (betrayal)</button>
+                    </form>
+                }
+                else if (Model.CanProposeAlliance)
+                {
+                    <form asp-action="ProposeAlliance" asp-route-id="@Model.GameId" method="post" class="d-flex gap-2 mt-2">
+                        <label class="visually-hidden" for="ally-pick">Commander to ally with</label>
+                        <select id="ally-pick" name="PartnerId" class="form-select form-select-sm" required>
+                            @foreach (var c in Model.AllianceCandidates)
+                            {
+                                <option value="@c.PlayerId">@c.Name@(c.HoldsGrudge ? " (betrayed)" : "")</option>
+                            }
+                        </select>
+                        <button type="submit" class="cr-btn sm green">Propose</button>
+                    </form>
+                    <p class="small cr-muted mt-2 mb-0">One proposal per turn. Each general decides in character and says why.</p>
+                }
+                else if (Model.CanAct && Model.AllianceProposedThisTurn && Model.HumanAlliance is null)
+                {
+                    <p class="small cr-muted mb-0">You've made your proposal this turn.</p>
+                }
+            </div>
+
             <div class="cr-panel">
                 <div class="cr-label"><span>Last roll</span></div>
                 <div id="last-roll">
@@ -417,7 +465,7 @@ else
                     }
                     else if (Model.CanAct && Model.Phase == TurnPhase.Action)
                     {
-                        bool canAttack = !Model.AttackUsedThisTurn && Model.AttackSources.Any();
+                        bool canAttack = !Model.AttackUsedThisTurn && Model.AttackSources.Any() && Model.EnemyCountries.Any();
                         <div class="row g-3 align-items-stretch">
                             <div class="col-md-5">
                                 <div class="d-grid gap-2">

@@ -36,6 +36,20 @@ public interface IGameEngineService
     /// <summary>Ends (or skips) the turn, then plays every NPC turn until it is the human's turn again.</summary>
     Task<MoveOutcome> EndTurnAsync(string gameId, string userId, CancellationToken cancellationToken = default);
 
+    /// <summary>Offers a pact to an NPC. The NPC accepts or refuses in character (one proposal per turn).</summary>
+    Task<MoveOutcome> ProposeAllianceAsync(string gameId, string userId, string partnerPlayerId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Breaks the human's pact early. The ally remembers the betrayal.</summary>
+    Task<MoveOutcome> BreakAllianceAsync(string gameId, string userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Loads a game for viewing and, if the human left a battle or turn idle past the limit, resolves it first
+    /// (anti-cheat: closing the browser mid-attack can't freeze or undo the game). Returns the message if it did.
+    /// </summary>
+    Task<(GameSession Session, string? TimeoutMessage)> GetGameEnforcingTimeoutsAsync(string gameId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Odds preview for the UI (e.g. "WIN ODDS 24%").</summary>
     double CalculateWinOdds(GameSession session, string fromCode, string toCode);
 }
@@ -54,4 +68,18 @@ public sealed class GameNotFoundException : Exception
     }
 
     public string GameId { get; }
+}
+
+/// <summary>
+/// The human's battle or turn was idle past the anti-cheat limit and was resolved by the server before
+/// their new move could run. <see cref="ReplayFromSequence"/> lets the page replay what happened.
+/// </summary>
+public sealed class TurnTimedOutException : Exception
+{
+    public TurnTimedOutException(string message, long replayFromSequence) : base(message)
+    {
+        ReplayFromSequence = replayFromSequence;
+    }
+
+    public long ReplayFromSequence { get; }
 }

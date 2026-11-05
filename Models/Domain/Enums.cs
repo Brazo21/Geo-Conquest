@@ -49,5 +49,19 @@ public enum GameEventType
     AttackSkipped,
     PlayerEliminated,
     GameWon,
-    GameLost
+    GameLost,
+    AllianceFormed,
+    AllianceRejected,
+    AllianceBroken,
+    AllianceExpired,
+    TurnTimedOut
+}
+
+/// <summary>State of a pact between two commanders.</summary>
+public enum AllianceStatus
+{
+    Active,
+    Expired,
+    Broken,
+    Ended
 }

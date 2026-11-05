@@ -26,12 +26,13 @@ Anyone with a game's link can watch it in real time; only the logged-in owner ca
 ### What to try
 1. **Watch without an account:** open *Live Games* and click any game. You see the board, dice and NPC reasoning live but get no buttons.
 2. **Play:** log in as the player (or sign up), pick a country on *New Game*, reinforce, attack, roll, transfer, end turn. Use 1×/2×/4× to fast-forward the NPC turns.
-3. **Share link:** press *Copy share link* in a game and open it in a private window to watch it update in real time.
-4. **Play on a phone:** open *📲 Get the app* (footer or account menu). Install it on Android or a computer with one tap, add it from Safari's *Share → Add to Home Screen* on iPhone, or scan the QR code.
-5. **Admin:** log in as the admin → *★ Admin panel*: search accounts, suspend (the user is signed out at once), reactivate, change roles, send a reset link.
-6. **Forgot password:** *Log in → Forgot password?* emails a single-use link valid for 30 minutes.
-7. **POPIA:** consent at sign-up, the full notice under *Privacy*, and *Your data* to view or delete your information.
-8. **Settings:** sound, music, vibration (Android), brightness, text size, dice animation and your General's look.
+3. **Alliances:** in a game, use the *Alliances* panel to offer a pact (the Defender is the most willing). Your ally disappears from the attack targets. *Break alliance* betrays them, and they never trust you again.
+4. **Share link:** press *Copy share link* in a game and open it in a private window to watch it update in real time.
+5. **Play on a phone:** open *📲 Get the app* (footer or account menu). Install it on Android or a computer with one tap, add it from Safari's *Share → Add to Home Screen* on iPhone, or scan the QR code.
+6. **Admin:** log in as the admin → *★ Admin panel*: search accounts, suspend (the user is signed out at once), reactivate, change roles, send a reset link.
+7. **Forgot password:** *Log in → Forgot password?* emails a single-use link valid for 30 minutes.
+8. **POPIA:** consent at sign-up, the full notice under *Privacy*, and *Your data* to view or delete your information.
+9. **Settings:** sound, music, vibration (Android), brightness, text size, dice animation and your General's look.
 
 ---
 
@@ -39,6 +40,8 @@ Anyone with a game's link can watch it in real time; only the logged-in owner ca
 
 - **Game engine** (`Services/GameEngineService.cs`): setup, reinforcements (+2 per country from round 2), dice combat (attacker keeps 1 soldier at home, higher die wins, ties change nothing), conquest, transfers, elimination and victory. All rules run on the server; the browser only displays results.
 - **NPCs** (`Services/Npc`): three personalities (Aggressor, Defender, Opportunist) that score every possible attack using exact win odds (`BattleOddsCalculator`) and record *why* they chose each move.
+- **Alliances:** on your turn, offer one NPC a pact (lasts the round plus 3 more; allies can't attack each other). Each personality decides in character and logs its reason: the Defender joins against the strongest player, the Opportunist against a runaway leader, and the Aggressor only allies with someone stronger. NPCs also ally with each other against the leader. Breaking a pact is a betrayal: that NPC refuses you forever and prefers your countries as targets. Rules live in `GameSession` (`FormAlliance`, `BreakAlliance`, `ExpireAlliances`, ally check in `BeginAttack`) and `NpcStrategy` (`ConsiderAlliance`, `SeekAlliance`).
+- **Anti-cheat / fair play:** every die is rolled on the server and saved before the page shows it, so refreshing, closing the tab or a second tab changes nothing. A battle abandoned for 5 minutes (e.g. browser closed mid-attack) counts as a retreat; a turn idle for 30 minutes ends itself, so a game can never be frozen (`GameEngineService.ApplyTimeoutIfDue`, run when anyone views or polls the game). The page warns before leaving mid-battle, buttons lock after one click so a double-click can't send two moves, every move is checked for owner and turn on the server, optimistic concurrency stops two tabs overwriting each other, and moves are rate-limited to 60 a minute per player.
 - **AI commentary** (`Services/Commentary`): Gemini through the OpenAI-compatible API with a fallback model, and built-in lines if the AI is busy, so a game never stalls.
 - **Live replay and spectating:** every event is stored in the game document; the page replays new events step by step, and spectators poll every 3 seconds.
 - **Accounts and security:** an Account security page to change password or email (current password required; other devices signed out), PBKDF2-hashed passwords, cookie authentication, Visitor / Player / Admin roles, anti-forgery tokens on every form, login rate limiting, a Content-Security-Policy with per-request nonces, security headers, HSTS, sessions that end immediately on suspension or password reset, and optimistic concurrency so two tabs can't corrupt a game.

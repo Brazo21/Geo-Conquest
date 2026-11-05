@@ -13,6 +13,12 @@ public sealed record ContinueDecision(bool KeepAttacking, double Odds, string Re
 
 public sealed record TransferOrder(string FromCode, string ToCode, int Amount, string Reason);
 
+/// <summary>An NPC's answer to an alliance proposal, with the reason shown in the game log.</summary>
+public sealed record AllianceDecision(bool Accept, string Reason);
+
+/// <summary>An NPC that wants a pact: who it asks, and why.</summary>
+public sealed record AllianceProposal(string PartnerId, string Reason, string PartnerReason);
+
 /// <summary>
 /// How an NPC thinks: scan every target, score odds × spoils − risk, decide, and explain.
 /// Pure decision-making: it reads the board and returns orders with reasons; the engine applies them.
@@ -28,4 +34,10 @@ public interface INpcStrategy
     TransferOrder? PlanPostConquestMove(GameSession session, Player npc, Country from, Country conquered);
 
     TransferOrder? PlanFortify(GameSession session, Player npc);
+
+    /// <summary>Should <paramref name="npc"/> accept a pact offered by <paramref name="proposer"/>? Decided by personality.</summary>
+    AllianceDecision ConsiderAlliance(GameSession session, Player npc, Player proposer);
+
+    /// <summary>Whether <paramref name="npc"/> looks for a pact with another NPC this turn (only ones that would say yes).</summary>
+    AllianceProposal? SeekAlliance(GameSession session, Player npc);
 }

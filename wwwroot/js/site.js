@@ -58,6 +58,23 @@
         form.querySelectorAll('.input-validation-error').forEach(el => jQuery(el).valid());
     });
 
+    // Anti-cheat / double moves: once a form really submits, its buttons are locked so one click = one move.
+    // Forms that ask for confirmation (data-confirm) only submit if the player agrees.
+    document.addEventListener('submit', ev => {
+        const form = ev.target;
+        if (!(form instanceof HTMLFormElement) || ev.defaultPrevented) return;
+        if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) { ev.preventDefault(); return; }
+        if ((form.method || '').toLowerCase() !== 'post') return;
+        setTimeout(() => form.querySelectorAll('button[type="submit"], button:not([type])').forEach(b => {
+            b.disabled = true;
+            b.setAttribute('aria-busy', 'true');
+        }), 0);
+    });
+    // Coming back with the browser's Back button: unlock the buttons again.
+    window.addEventListener('pageshow', ev => {
+        if (ev.persisted) document.querySelectorAll('button[aria-busy="true"]').forEach(b => { b.disabled = false; b.removeAttribute('aria-busy'); });
+    });
+
     // Dropdowns that submit their form when changed.
     document.addEventListener('change', ev => {
         if (ev.target.matches?.('[data-autosubmit]')) ev.target.form?.submit();

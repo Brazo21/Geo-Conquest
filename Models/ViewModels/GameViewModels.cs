@@ -74,7 +74,15 @@ public sealed record PlayerRow(
 
 public sealed record CountryRow(
     string Code, string Name, string OwnerId, string OwnerName, string Color,
-    int Soldiers, int SoldierValue, bool IsMine);
+    int Soldiers, int SoldierValue, bool IsMine, bool IsAllied = false);
+
+/// <summary>One pact on the board, for the Alliances panel.</summary>
+public sealed record AllianceRow(
+    string FirstName, string FirstColor, string SecondName, string SecondColor,
+    int UntilRound, bool InvolvesHuman, string? PartnerOfHumanId);
+
+/// <summary>An NPC the human could offer a pact to.</summary>
+public sealed record AllianceCandidate(string PlayerId, string Name, string Color, bool HoldsGrudge);
 
 public sealed record EventRow(
     long Sequence, int Round, GameEventType Type, string Message, string? Reasoning,
@@ -148,7 +156,17 @@ public sealed class PlayGameViewModel
     public BattleView? Battle { get; init; }
 
     public IEnumerable<CountryRow> MyCountries => Countries.Where(c => c.IsMine);
-    public IEnumerable<CountryRow> EnemyCountries => Countries.Where(c => !c.IsMine);
+    /// <summary>Countries the human may attack: not their own, and not an ally's.</summary>
+    public IEnumerable<CountryRow> EnemyCountries => Countries.Where(c => !c.IsMine && !c.IsAllied);
+
+    // ── Alliances ──
+    public IReadOnlyList<AllianceRow> Alliances { get; init; } = Array.Empty<AllianceRow>();
+    public AllianceRow? HumanAlliance => Alliances.FirstOrDefault(a => a.InvolvesHuman);
+    public IReadOnlyList<AllianceCandidate> AllianceCandidates { get; init; } = Array.Empty<AllianceCandidate>();
+    public bool AllianceProposedThisTurn { get; init; }
+    public bool CanProposeAlliance => CanAct && Phase != TurnPhase.Attacking && HumanAlliance is null &&
+                                      !AllianceProposedThisTurn && AllianceCandidates.Count > 0;
+    public bool CanBreakAlliance => CanAct && Phase != TurnPhase.Attacking && HumanAlliance is not null;
     public IEnumerable<CountryRow> AttackSources => MyCountries.Where(c => c.Soldiers >= Country.MinimumAttackingStrength);
 
     public static PlayGameViewModel From(GameSession session, string? userId, IBattleOddsCalculator odds, int recentEvents = 60)
@@ -162,7 +180,8 @@ public sealed class PlayGameViewModel
             .OrderByDescending(c => c.SoldierCount)
             .Select(c => new CountryRow(
                 c.Code, c.Name, c.OwnerId, players[c.OwnerId].DisplayName, players[c.OwnerId].ColorHex,
-                c.SoldierCount, c.SoldierValue, c.IsOwnedBy(human.PlayerId)))
+                c.SoldierCount, c.SoldierValue, c.IsOwnedBy(human.PlayerId),
+                session.AreAllied(human.PlayerId, c.OwnerId)))
             .ToList();
 
         BattleView? battle = null;
@@ -206,6 +225,19 @@ public sealed class PlayGameViewModel
             LastEventSequence = session.LastEventSequence,
             Countries = countries,
             Battle = battle,
+            AllianceProposedThisTurn = session.AllianceProposedThisTurn,
+            Alliances = session.Alliances
+                .Where(a => a.IsActive)
+                .Select(a => new AllianceRow(
+                    players[a.PlayerAId].DisplayName, players[a.PlayerAId].ColorHex,
+                    players[a.PlayerBId].DisplayName, players[a.PlayerBId].ColorHex,
+                    a.ExpiresAfterRound, a.Includes(human.PlayerId),
+                    a.Includes(human.PlayerId) ? a.PartnerOf(human.PlayerId) : null))
+                .ToList(),
+            AllianceCandidates = session.GetActivePlayers()
+                .Where(p => !p.IsHuman() && session.GetActiveAlliance(p.PlayerId) is null)
+                .Select(p => new AllianceCandidate(p.PlayerId, p.DisplayName, p.ColorHex, session.HasBetrayed(human.PlayerId, p.PlayerId)))
+                .ToList(),
             Players = session.Players
                 .OrderBy(p => p.TurnOrder)
                 .Select(p => new PlayerRow(

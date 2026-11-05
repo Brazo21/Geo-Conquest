@@ -15,10 +15,14 @@ public sealed class GameSession
     public const int BoardSize = 10;
     public const int MinimumPlayers = 2;
 
+    /// <summary>An alliance holds for the rest of the round it is made in, plus this many full rounds.</summary>
+    public const int AllianceLengthRounds = 3;
+
     // Mapped explicitly as "players" / "countries" in MongoMappings; never exposed as mutable lists.
     private List<Player> _players = new();
     private List<Country> _countries = new();
     private List<GameEvent> _events = new();
+    private List<Alliance> _alliances = new();
 
     public string Id { get; private set; } = string.Empty;
 
@@ -39,6 +43,15 @@ public sealed class GameSession
 
     /// <summary>One attack per turn.</summary>
     public bool AttackUsedThisTurn { get; private set; }
+
+    /// <summary>One alliance proposal per turn, so a player can't spam every NPC until one says yes.</summary>
+    public bool AllianceProposedThisTurn { get; private set; }
+
+    /// <summary>
+    /// When the human last acted (or their turn began). Anti-cheat: a battle or turn left idle too long
+    /// is resolved by the server, so closing the browser mid-attack never freezes or undoes anything.
+    /// </summary>
+    public DateTime? LastHumanActivityUtc { get; private set; }
 
     /// <summary>Set while a multi-roll attack is in progress, so it survives across HTTP requests.</summary>
     public string? ActiveAttackerCode { get; private set; }
@@ -67,6 +80,8 @@ public sealed class GameSession
     public IReadOnlyList<Country> Countries => _countries.AsReadOnly();
 
     public IReadOnlyList<GameEvent> Events => _events.AsReadOnly();
+
+    public IReadOnlyList<Alliance> Alliances => _alliances.AsReadOnly();
 
     // Required by the MongoDB serializer; not usable by application code.
     private GameSession()
@@ -195,6 +210,19 @@ public sealed class GameSession
     public int GetTotalSoldiers(string playerId) =>
         _countries.Where(c => c.IsOwnedBy(playerId)).Sum(c => c.SoldierCount);
 
+    // ───────────────────────────── Alliances: queries ─────────────────────────────
+
+    public Alliance? GetActiveAlliance(string playerId) =>
+        _alliances.FirstOrDefault(a => a.IsActive && a.Includes(playerId));
+
+    public bool AreAllied(string playerAId, string playerBId) =>
+        playerAId != playerBId &&
+        _alliances.Any(a => a.IsActive && a.Includes(playerAId) && a.Includes(playerBId));
+
+    /// <summary>True if <paramref name="betrayerId"/> once broke an alliance with <paramref name="victimId"/>.</summary>
+    public bool HasBetrayed(string betrayerId, string victimId) =>
+        _alliances.Any(a => a.Status == AllianceStatus.Broken && a.BrokenByPlayerId == betrayerId && a.Includes(victimId));
+
     /// <summary>True when this authenticated user may act right now (it is their human seat's turn).</summary>
     public bool CanUserAct(string? userId) =>
         Status == GameStatus.InProgress &&
@@ -271,6 +299,12 @@ public sealed class GameSession
             throw new DomainException($"You do not control {attacker.Name}.");
         if (defender.IsOwnedBy(playerId))
             throw new DomainException($"You cannot attack your own country ({defender.Name}).");
+        if (AreAllied(playerId, defender.OwnerId))
+        {
+            var pact = GetActiveAlliance(playerId)!;
+            throw new DomainException(
+                $"{defender.Name} belongs to your ally {GetPlayer(defender.OwnerId).DisplayName} (pact until the end of round {pact.ExpiresAfterRound}). Break the alliance first.");
+        }
         if (!attacker.CanLaunchAttack())
             throw new DomainException($"{attacker.Name} needs at least {Country.MinimumAttackingStrength} soldiers to attack.");
 
@@ -329,6 +363,74 @@ public sealed class GameSession
         throw new DomainException("No active players remain.");
     }
 
+    // ───────────────────────────── Alliances: commands ─────────────────────────────
+
+    /// <summary>Uses up the current player's one alliance proposal for this turn.</summary>
+    public void RecordAllianceProposal(string proposerId)
+    {
+        EnsureCurrentPlayer(proposerId);
+        if (Phase == TurnPhase.Attacking)
+            throw new DomainException("Finish the attack before talking alliances.");
+        if (AllianceProposedThisTurn)
+            throw new DomainException("You can propose one alliance per turn. Try again next turn.");
+
+        AllianceProposedThisTurn = true;
+    }
+
+    /// <summary>Seals a pact the partner has agreed to (the engine and NPC brain decide whether they agree).</summary>
+    public Alliance FormAlliance(string proposerId, string partnerId)
+    {
+        EnsureCurrentPlayer(proposerId);
+        if (Phase == TurnPhase.Attacking)
+            throw new DomainException("Finish the attack before forming an alliance.");
+
+        var proposer = GetPlayer(proposerId);
+        var partner = GetPlayer(partnerId);
+        if (proposer.PlayerId == partner.PlayerId)
+            throw new DomainException("You cannot ally with yourself.");
+        if (proposer.IsEliminated || partner.IsEliminated)
+            throw new DomainException("Eliminated commanders cannot form alliances.");
+        if (GetActivePlayers().Count <= 2)
+            throw new DomainException("With only two commanders left, there is no one to ally against.");
+        if (GetActiveAlliance(proposerId) is not null)
+            throw new DomainException($"{proposer.DisplayName} already has an alliance.");
+        if (GetActiveAlliance(partnerId) is not null)
+            throw new DomainException($"{partner.DisplayName} already has an alliance.");
+
+        var alliance = Alliance.Form(proposerId, partnerId, Round, AllianceLengthRounds);
+        _alliances.Add(alliance);
+        return alliance;
+    }
+
+    /// <summary>Breaks the current player's pact early. The other side will remember the betrayal.</summary>
+    public Alliance BreakAlliance(string playerId)
+    {
+        EnsureCurrentPlayer(playerId);
+        if (Phase == TurnPhase.Attacking)
+            throw new DomainException("Finish the attack before breaking an alliance.");
+
+        var alliance = GetActiveAlliance(playerId) ?? throw new DomainException("You have no alliance to break.");
+        alliance.Break(playerId, Round);
+        return alliance;
+    }
+
+    /// <summary>Ends pacts whose time is up. The engine logs each one.</summary>
+    public IReadOnlyList<Alliance> ExpireAlliances()
+    {
+        var due = _alliances.Where(a => a.IsActive && Round > a.ExpiresAfterRound).ToList();
+        foreach (var alliance in due)
+            alliance.Expire(Round);
+        return due.AsReadOnly();
+    }
+
+    // ───────────────────────────── Anti-cheat: activity clock ─────────────────────────────
+
+    /// <summary>Called by the engine whenever the human acts or their turn begins.</summary>
+    public void MarkHumanActivity(DateTime utcNow) => LastHumanActivityUtc = utcNow;
+
+    /// <summary>How long the human has been idle (older games without the clock use the last save time).</summary>
+    public TimeSpan HumanIdleFor(DateTime utcNow) => utcNow - (LastHumanActivityUtc ?? UpdatedAtUtc);
+
     // ───────────────────────────── End conditions ─────────────────────────────
 
     public void EliminatePlayer(string playerId)
@@ -339,6 +441,8 @@ public sealed class GameSession
             throw new DomainException($"{player.DisplayName} still controls territory and cannot be eliminated.");
 
         player.Eliminate(Round);
+        foreach (var alliance in _alliances.Where(a => a.IsActive && a.Includes(playerId)))
+            alliance.End(Round);
     }
 
     public void DeclareWinner(string playerId)
@@ -421,6 +525,7 @@ public sealed class GameSession
         Phase = TurnPhase.Action;
         PendingReinforcements = 0;
         AttackUsedThisTurn = false;
+        AllianceProposedThisTurn = false;
         ActiveAttackerCode = null;
         ActiveDefenderCode = null;
     }

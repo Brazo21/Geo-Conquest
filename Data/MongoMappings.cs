@@ -39,6 +39,12 @@ public static class MongoMappings
             cm.MapIdMember(u => u.Id);
         });
 
+        BsonClassMap.TryRegisterClassMap<Alliance>(cm =>
+        {
+            cm.AutoMap();
+            cm.UnmapMember(a => a.IsActive);
+        });
+
         BsonClassMap.TryRegisterClassMap<GameEvent>(cm =>
         {
             cm.AutoMap();
@@ -59,7 +65,9 @@ public static class MongoMappings
             cm.UnmapMember(g => g.Players);
             cm.UnmapMember(g => g.Countries);
             cm.UnmapMember(g => g.Events);
+            cm.UnmapMember(g => g.Alliances);
             cm.MapField("_players").SetElementName("players");
+            cm.MapField("_alliances").SetElementName("alliances");   // games saved before alliances simply have none
             cm.MapField("_countries").SetElementName("countries");
             cm.MapField("_events").SetElementName("events");
         });

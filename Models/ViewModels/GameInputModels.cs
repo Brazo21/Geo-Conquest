@@ -48,3 +48,10 @@ public sealed class AttackInput
     [StringLength(3, MinimumLength = 2)]
     public string ToCode { get; set; } = string.Empty;
 }
+
+public sealed class AllianceInput
+{
+    [Required(ErrorMessage = "Choose a commander to ally with.")]
+    [RegularExpression("^[a-f0-9]{32}$", ErrorMessage = "Choose a commander to ally with.")]
+    public string PartnerId { get; set; } = string.Empty;
+}

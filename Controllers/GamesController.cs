@@ -6,6 +6,7 @@ using GeoConquest.Security;
 using GeoConquest.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace GeoConquest.Controllers;
 
@@ -75,7 +76,11 @@ public sealed class GamesController : Controller
 
         try
         {
-            var session = await _engine.GetGameAsync(id, cancellationToken);
+            // Anti-cheat: a battle or turn the commander walked away from is resolved before anyone views it.
+            var (session, timeoutMessage) = await _engine.GetGameEnforcingTimeoutsAsync(id, cancellationToken);
+            if (timeoutMessage is not null && session.IsOwnedBy(CurrentUserId))
+                TempData["Error"] = timeoutMessage;
+
             var model = PlayGameViewModel.From(session, CurrentUserId, _odds);
             model.ReplayFrom = replay is >= 0 && replay < session.LastEventSequence ? replay : null;
 
@@ -103,8 +108,16 @@ public sealed class GamesController : Controller
         if (!InputGuard.IsGameId(id))
             return NotFound();
 
-        var session = await _games.GetByIdAsync(id, cancellationToken);
-        return session is null ? NotFound() : Json(GameFeedDto.From(session, after, CurrentUserId));
+        try
+        {
+            // Spectators polling also keep an abandoned game moving (same anti-cheat rule as above).
+            var (session, _) = await _engine.GetGameEnforcingTimeoutsAsync(id, cancellationToken);
+            return Json(GameFeedDto.From(session, after, CurrentUserId));
+        }
+        catch (GameNotFoundException)
+        {
+            return NotFound();
+        }
     }
 
     // ───────────────────────────── Start a game (players) ─────────────────────────────
@@ -139,33 +152,51 @@ public sealed class GamesController : Controller
 
     [HttpPost]
     [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
     public Task<IActionResult> Reinforce(string id, ReinforceInput input, CancellationToken ct) =>
         ExecuteMoveAsync(id, userId => _engine.PlaceReinforcementsAsync(id, userId, input.CountryCode, input.Amount, ct));
 
     [HttpPost]
     [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
     public Task<IActionResult> Transfer(string id, TransferInput input, CancellationToken ct) =>
         ExecuteMoveAsync(id, userId => _engine.TransferAsync(id, userId, input.FromCode, input.ToCode, input.Amount, ct));
 
     [HttpPost]
     [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
     public Task<IActionResult> Attack(string id, AttackInput input, CancellationToken ct) =>
         ExecuteMoveAsync(id, userId => _engine.StartAttackAsync(id, userId, input.FromCode, input.ToCode, ct));
 
     [HttpPost]
     [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
     public Task<IActionResult> Roll(string id, CancellationToken ct) =>
         ExecuteMoveAsync(id, userId => _engine.RollAsync(id, userId, ct));
 
     [HttpPost]
     [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
     public Task<IActionResult> Retreat(string id, CancellationToken ct) =>
         ExecuteMoveAsync(id, userId => _engine.RetreatAsync(id, userId, ct));
 
     [HttpPost]
     [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
     public Task<IActionResult> EndTurn(string id, CancellationToken ct) =>
         ExecuteMoveAsync(id, userId => _engine.EndTurnAsync(id, userId, ct));
+
+    [HttpPost]
+    [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
+    public Task<IActionResult> ProposeAlliance(string id, AllianceInput input, CancellationToken ct) =>
+        ExecuteMoveAsync(id, userId => _engine.ProposeAllianceAsync(id, userId, input.PartnerId, ct));
+
+    [HttpPost]
+    [Authorize(Roles = UserAccount.PlayerRole)]
+    [EnableRateLimiting(RateLimitPolicies.Moves)]
+    public Task<IActionResult> BreakAlliance(string id, CancellationToken ct) =>
+        ExecuteMoveAsync(id, userId => _engine.BreakAllianceAsync(id, userId, ct));
 
     /// <summary>Runs one move and turns rule violations into a friendly message on the game page.</summary>
     private async Task<IActionResult> ExecuteMoveAsync(string id, Func<string, Task<MoveOutcome>> move)
@@ -183,6 +214,12 @@ public sealed class GamesController : Controller
         {
             var outcome = await move(CurrentUserId!);
             return RedirectToAction(nameof(Play), new { id, replay = outcome.ReplayFromSequence });
+        }
+        catch (TurnTimedOutException ex)
+        {
+            // The turn had been abandoned: show what the server did, then replay the NPC turns that followed.
+            TempData["Error"] = ex.Message;
+            return RedirectToAction(nameof(Play), new { id, replay = ex.ReplayFromSequence });
         }
         catch (DomainException ex)
         {

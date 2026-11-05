@@ -11,6 +11,8 @@ public sealed class NpcStrategy : INpcStrategy
 {
     private const int EliminationBonus = 3;
     private const int BledTargetBonus = 2;
+    private const int RevengeBonus = 2;          // NPCs prefer to hit a commander who betrayed them
+    private const double LeaderThreatRatio = 1.3; // a leader this much stronger makes NPCs look for allies
 
     private readonly IBattleOddsCalculator _odds;
 
@@ -103,6 +105,8 @@ public sealed class NpcStrategy : INpcStrategy
         string knockout = strike.EliminatesOwner
             ? $", and it would knock {session.GetPlayer(strike.Target.OwnerId).DisplayName} out of the game"
             : string.Empty;
+        if (session.HasBetrayed(strike.Target.OwnerId, npc.PlayerId))
+            knockout += $", and it settles the score for {session.GetPlayer(strike.Target.OwnerId).DisplayName}'s betrayal";
 
         return new AttackPlan(
             strike.Source.Code,
@@ -171,16 +175,87 @@ public sealed class NpcStrategy : INpcStrategy
             $"Moves {amount} from safer {donor.Name} to {target.Name}, which {targetThreat.Enemy.Name} threatens at {danger:P0}.");
     }
 
+    // ───────────────────────────── Alliances ─────────────────────────────
+
+    public AllianceDecision ConsiderAlliance(GameSession session, Player npc, Player proposer)
+    {
+        if (session.HasBetrayed(proposer.PlayerId, npc.PlayerId))
+            return new AllianceDecision(false, $"Refuses: it will never trust {proposer.DisplayName} again after that betrayal.");
+        if (session.GetActiveAlliance(npc.PlayerId) is { } existing)
+            return new AllianceDecision(false,
+                $"Refuses: it is already allied with {session.GetPlayer(existing.PartnerOf(npc.PlayerId)).DisplayName}.");
+        if (session.GetActivePlayers().Count <= 2)
+            return new AllianceDecision(false, "Refuses: with only two commanders left, there is no one to fight together.");
+
+        int mine = session.GetTotalSoldiers(npc.PlayerId);
+        int theirs = session.GetTotalSoldiers(proposer.PlayerId);
+        var leader = StrongestActive(session);
+        int leaderSoldiers = session.GetTotalSoldiers(leader.PlayerId);
+
+        return npc.Profile switch
+        {
+            NpcProfile.Defender => leader.PlayerId == proposer.PlayerId
+                ? new AllianceDecision(false, $"Refuses: {proposer.DisplayName} is already the strongest ({theirs} soldiers). Defenders don't help the leader grow.")
+                : new AllianceDecision(true, leader.PlayerId == npc.PlayerId
+                    ? "Accepts: a quiet border lets it keep building its garrisons."
+                    : $"Accepts: safety in numbers against {leader.DisplayName} ({leaderSoldiers} soldiers)."),
+
+            NpcProfile.Opportunist => leader.PlayerId != npc.PlayerId && leader.PlayerId != proposer.PlayerId &&
+                                      leaderSoldiers > Math.Max(mine, theirs)
+                ? new AllianceDecision(true, $"Accepts: together they can bleed runaway {leader.DisplayName} ({leaderSoldiers} soldiers).")
+                : new AllianceDecision(false, "Refuses: there is no common enemy worth ganging up on right now."),
+
+            NpcProfile.Aggressor => theirs > mine * 1.2
+                ? new AllianceDecision(true, $"Accepts, for now: {proposer.DisplayName} ({theirs}) is too strong to fight head-on ({mine}).")
+                : new AllianceDecision(false, $"Refuses: it would rather conquer {proposer.DisplayName} ({theirs}) than share the world."),
+
+            _ => new AllianceDecision(false, "Refuses.")
+        };
+    }
+
+    public AllianceProposal? SeekAlliance(GameSession session, Player npc)
+    {
+        // Aggressors go it alone; nobody looks for a second pact or allies in a two-player endgame.
+        if (npc.Profile == NpcProfile.Aggressor || session.GetActiveAlliance(npc.PlayerId) is not null ||
+            session.GetActivePlayers().Count <= 2)
+            return null;
+
+        var leader = StrongestActive(session);
+        int leaderSoldiers = session.GetTotalSoldiers(leader.PlayerId);
+        if (leader.PlayerId == npc.PlayerId || leaderSoldiers < session.GetTotalSoldiers(npc.PlayerId) * LeaderThreatRatio)
+            return null;
+
+        // Only other NPCs, and only ones that would actually agree (no pointless refusals in the log).
+        foreach (var candidate in session.GetActivePlayers()
+                     .Where(p => !p.IsHuman() && p.PlayerId != npc.PlayerId && p.PlayerId != leader.PlayerId)
+                     .Where(p => !session.HasBetrayed(p.PlayerId, npc.PlayerId))
+                     .OrderByDescending(p => session.GetTotalSoldiers(p.PlayerId)))
+        {
+            var answer = ConsiderAlliance(session, candidate, npc);
+            if (answer.Accept)
+                return new AllianceProposal(candidate.PlayerId,
+                    $"Seeks help against {leader.DisplayName} ({leaderSoldiers} soldiers).", answer.Reason);
+        }
+
+        return null;
+    }
+
+    private static Player StrongestActive(GameSession session) =>
+        session.GetActivePlayers().OrderByDescending(p => session.GetTotalSoldiers(p.PlayerId)).First();
+
     // ───────────────────────────── Scoring ─────────────────────────────
 
-    private sealed record StrikeOption(Country Source, Country Target, double Odds, double Score, bool EliminatesOwner);
+    private sealed record StrikeOption(Country Source, Country Target, double Odds, double Score, bool EliminatesOwner, bool Revenge = false);
 
     private sealed record Threat(Country Country, Country Enemy, double Odds);
 
     private IEnumerable<StrikeOption> EnumerateOptions(GameSession session, Player npc, int extraOnSource)
     {
         var owned = session.GetCountriesOwnedBy(npc.PlayerId);
-        var enemies = session.Countries.Where(c => !c.IsOwnedBy(npc.PlayerId)).ToList();
+        // Allies' countries are off limits while the pact holds.
+        var enemies = session.Countries
+            .Where(c => !c.IsOwnedBy(npc.PlayerId) && !session.AreAllied(npc.PlayerId, c.OwnerId))
+            .ToList();
 
         foreach (var source in owned)
         {
@@ -192,7 +267,8 @@ public sealed class NpcStrategy : INpcStrategy
             {
                 double odds = _odds.AttackerWinProbability(strength, target.SoldierCount);
                 bool eliminates = session.GetCountriesOwnedBy(target.OwnerId).Count == 1;
-                yield return new StrikeOption(source, target, odds, 0, eliminates);
+                bool revenge = session.HasBetrayed(target.OwnerId, npc.PlayerId);
+                yield return new StrikeOption(source, target, odds, 0, eliminates, revenge);
             }
         }
     }
@@ -222,6 +298,8 @@ public sealed class NpcStrategy : INpcStrategy
         double gain = option.Target.GetConquestReward();
         if (option.EliminatesOwner)
             gain += EliminationBonus;
+        if (option.Revenge)
+            gain += RevengeBonus;
         if (personality.Profile == NpcProfile.Opportunist && option.Target.SoldierCount < option.Target.SoldierValue)
             gain += BledTargetBonus; // the target has already been bled by someone else
 
@@ -249,7 +327,7 @@ public sealed class NpcStrategy : INpcStrategy
 
         foreach (var enemy in session.Countries)
         {
-            if (enemy.IsOwnedBy(country.OwnerId) || !enemy.CanLaunchAttack())
+            if (enemy.IsOwnedBy(country.OwnerId) || !enemy.CanLaunchAttack() || session.AreAllied(enemy.OwnerId, country.OwnerId))
                 continue;
 
             double odds = _odds.AttackerWinProbability(enemy.SoldierCount, country.SoldierCount);

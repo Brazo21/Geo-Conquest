@@ -18,6 +18,12 @@ public sealed class GameEngineService : IGameEngineService
     public const int ReinforcementsPerCountry = 2;
     private const int MaxNpcTurnsPerRequest = 100;
 
+    /// <summary>Anti-cheat: a battle left untouched this long counts as a retreat (closing the browser can't stall it).</summary>
+    public static readonly TimeSpan AttackIdleLimit = TimeSpan.FromMinutes(5);
+
+    /// <summary>Anti-cheat: a whole turn left untouched this long ends automatically so the world keeps moving.</summary>
+    public static readonly TimeSpan TurnIdleLimit = TimeSpan.FromMinutes(30);
+
     private static readonly string[] Palette =
     {
         "#3DDC84", // human: green
@@ -171,6 +177,67 @@ public sealed class GameEngineService : IGameEngineService
             EndTurnAndPlayNpcs(session);
         }, cancellationToken);
 
+    public Task<MoveOutcome> ProposeAllianceAsync(string gameId, string userId, string partnerPlayerId,
+        CancellationToken cancellationToken = default) =>
+        ExecuteHumanActionAsync(gameId, userId, (session, human) =>
+        {
+            var partner = session.Players.FirstOrDefault(p => p.PlayerId == partnerPlayerId)
+                          ?? throw new DomainException("Choose a commander to ally with.");
+            if (partner.IsHuman() || partner.IsEliminated)
+                throw new DomainException("You can only ally with an NPC that is still in the game.");
+            if (session.GetActiveAlliance(human.PlayerId) is not null)
+                throw new DomainException("You already have an alliance. Break it before proposing a new one.");
+
+            session.RecordAllianceProposal(human.PlayerId);
+            var answer = _npc.ConsiderAlliance(session, partner, human);
+
+            if (answer.Accept)
+            {
+                var pact = session.FormAlliance(human.PlayerId, partner.PlayerId);
+                session.AppendEvent(GameEvent.Create(GameEventType.AllianceFormed,
+                    $"{partner.DisplayName} accepts {human.DisplayName}'s alliance. Neither may attack the other until the end of round {pact.ExpiresAfterRound}.",
+                    partner.PlayerId, answer.Reason));
+            }
+            else
+            {
+                session.AppendEvent(GameEvent.Create(GameEventType.AllianceRejected,
+                    $"{partner.DisplayName} turns down {human.DisplayName}'s alliance.",
+                    partner.PlayerId, answer.Reason));
+            }
+        }, cancellationToken);
+
+    public Task<MoveOutcome> BreakAllianceAsync(string gameId, string userId, CancellationToken cancellationToken = default) =>
+        ExecuteHumanActionAsync(gameId, userId, (session, human) =>
+        {
+            var pact = session.BreakAlliance(human.PlayerId);
+            var former = session.GetPlayer(pact.PartnerOf(human.PlayerId));
+            session.AppendEvent(GameEvent.Create(GameEventType.AllianceBroken,
+                $"{human.DisplayName} breaks the alliance with {former.DisplayName}! {former.DisplayName} will not forget this betrayal.",
+                human.PlayerId));
+        }, cancellationToken);
+
+    public async Task<(GameSession Session, string? TimeoutMessage)> GetGameEnforcingTimeoutsAsync(string gameId,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await GetGameAsync(gameId, cancellationToken);
+        long seenUpTo = session.LastEventSequence;
+        string? message = ApplyTimeoutIfDue(session);
+        if (message is null)
+            return (session, null);
+
+        try
+        {
+            await _commentary.AnnotateAsync(session, seenUpTo, cancellationToken);
+            await _repository.UpdateAsync(session, cancellationToken);
+            return (session, message);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            // Another viewer resolved it at the same moment: show the saved result.
+            return (await GetGameAsync(gameId, cancellationToken), null);
+        }
+    }
+
     public double CalculateWinOdds(GameSession session, string fromCode, string toCode)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -193,11 +260,24 @@ public sealed class GameEngineService : IGameEngineService
             throw new UnauthorizedAccessException("Only the commander who started this game can play it. You can still watch.");
         if (session.Status != GameStatus.InProgress)
             throw new DomainException("This game is over.");
+
+        long seenUpTo = session.LastEventSequence;
+
+        // Anti-cheat: if the battle or turn was abandoned past the limit, resolve that first and refuse this move.
+        string? timeout = ApplyTimeoutIfDue(session);
+        if (timeout is not null)
+        {
+            await _commentary.AnnotateAsync(session, seenUpTo, cancellationToken);
+            await _repository.UpdateAsync(session, cancellationToken);
+            throw new TurnTimedOutException(timeout, seenUpTo);
+        }
+
         if (!session.CanUserAct(userId))
             throw new DomainException("It is not your turn yet.");
 
-        long seenUpTo = session.LastEventSequence;
         action(session, session.GetCurrentPlayer());
+        if (session.Status == GameStatus.InProgress && session.GetCurrentPlayer().IsHuman())
+            session.MarkHumanActivity(DateTime.UtcNow);
 
         await _commentary.AnnotateAsync(session, seenUpTo, cancellationToken);
         await _repository.UpdateAsync(session, cancellationToken);
@@ -221,6 +301,73 @@ public sealed class GameEngineService : IGameEngineService
 
         session.AppendEvent(GameEvent.Create(GameEventType.TurnStarted,
             $"Round {session.Round}: {player.DisplayName}'s turn.{extra}", player.PlayerId));
+
+        if (player.IsHuman())
+            session.MarkHumanActivity(DateTime.UtcNow);   // the idle clock starts when the human's turn does
+    }
+
+    /// <summary>Advances to the next player, then logs any alliances whose time ran out.</summary>
+    private void AdvanceTurn(GameSession session)
+    {
+        session.AdvanceTurn();
+        foreach (var pact in session.ExpireAlliances())
+        {
+            var a = session.GetPlayer(pact.PlayerAId);
+            var b = session.GetPlayer(pact.PlayerBId);
+            session.AppendEvent(GameEvent.Create(GameEventType.AllianceExpired,
+                $"The alliance between {a.DisplayName} and {b.DisplayName} has run its course. They are fair game again.",
+                a.PlayerId));
+        }
+    }
+
+    /// <summary>
+    /// Anti-cheat. If the human abandoned a battle (closed the browser, walked away) for longer than
+    /// <see cref="AttackIdleLimit"/>, the battle counts as a retreat and the turn passes. An idle turn past
+    /// <see cref="TurnIdleLimit"/> ends automatically (unplaced reinforcements go to the strongest country).
+    /// Nothing is ever rolled back or re-rolled. Returns a message when it acted, otherwise null.
+    /// </summary>
+    private string? ApplyTimeoutIfDue(GameSession session)
+    {
+        if (session.Status != GameStatus.InProgress || !session.GetCurrentPlayer().IsHuman())
+            return null;
+
+        var human = session.GetCurrentPlayer();
+        var idle = session.HumanIdleFor(DateTime.UtcNow);
+        string message;
+
+        if (session.Phase == TurnPhase.Attacking && idle > AttackIdleLimit)
+        {
+            ApplyRetreat(session, human,
+                $"Fair play: the battle was left untouched for over {AttackIdleLimit.TotalMinutes:0} minutes, so it counts as a retreat.");
+            message = $"You left the battle for over {AttackIdleLimit.TotalMinutes:0} minutes, so it was called off as a retreat and your turn ended.";
+        }
+        else if (idle > TurnIdleLimit)
+        {
+            if (session.Phase == TurnPhase.Attacking)
+                ApplyRetreat(session, human, "Fair play: the turn was left idle, so the attack was called off.");
+
+            if (session.Phase == TurnPhase.Reinforcement && session.PendingReinforcements > 0)
+            {
+                var strongest = session.GetCountriesOwnedBy(human.PlayerId).OrderByDescending(c => c.SoldierCount).First();
+                int amount = session.PendingReinforcements;
+                session.PlaceReinforcements(human.PlayerId, strongest.Code, amount);
+                session.AppendEvent(GameEvent.Create(GameEventType.Reinforced,
+                    $"{amount} waiting reinforcement(s) report to {strongest.Name} ({strongest.SoldierCount}).",
+                    human.PlayerId, "Placed automatically: the turn was left idle.", toCountryCode: strongest.Code));
+            }
+
+            message = $"Your turn was idle for over {TurnIdleLimit.TotalMinutes:0} minutes, so it ended automatically.";
+        }
+        else
+        {
+            return null;
+        }
+
+        session.AppendEvent(GameEvent.Create(GameEventType.TurnTimedOut,
+            $"{human.DisplayName} was away too long. The turn passes (fair-play rule).", human.PlayerId));
+        _logger.LogInformation("Game {GameId}: idle human turn resolved after {Idle}", session.Id, idle);
+        EndTurnAndPlayNpcs(session);
+        return message;
     }
 
     private void EndTurnAndPlayNpcs(GameSession session)
@@ -228,7 +375,7 @@ public sealed class GameEngineService : IGameEngineService
         if (session.Status != GameStatus.InProgress)
             return;
 
-        session.AdvanceTurn();
+        AdvanceTurn(session);
         BeginTurn(session);
         RunNpcTurnsUntilHuman(session);
     }
@@ -250,7 +397,7 @@ public sealed class GameEngineService : IGameEngineService
             if (session.Status != GameStatus.InProgress)
                 break;
 
-            session.AdvanceTurn();
+            AdvanceTurn(session);
             BeginTurn(session);
         }
     }
@@ -259,6 +406,17 @@ public sealed class GameEngineService : IGameEngineService
 
     private void PlayNpcTurn(GameSession session, Player npc)
     {
+        // 0. Diplomacy: NPCs team up against a runaway leader (only with partners who agree).
+        var proposal = _npc.SeekAlliance(session, npc);
+        if (proposal is not null)
+        {
+            var partner = session.GetPlayer(proposal.PartnerId);
+            var pact = session.FormAlliance(npc.PlayerId, partner.PlayerId);
+            session.AppendEvent(GameEvent.Create(GameEventType.AllianceFormed,
+                $"{npc.DisplayName} and {partner.DisplayName} form an alliance until the end of round {pact.ExpiresAfterRound}.",
+                npc.PlayerId, $"{proposal.Reason} {partner.DisplayName}: {proposal.PartnerReason}"));
+        }
+
         // 1. Reinforce
         foreach (var order in _npc.PlanReinforcements(session, npc))
         {
