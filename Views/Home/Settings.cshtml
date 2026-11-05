@@ -1,0 +1,189 @@
+@{
+    ViewData["Title"] = "Settings";
+
+    // Choice lists for the radio groups (value, label).
+    var textSizes = new[] { ("sm", "Small"), ("md", "Normal"), ("lg", "Large"), ("xl", "Huge") };
+    var diceModes = new[] { ("full", "Full roll"), ("quick", "Quick"), ("off", "Off") };
+    var skins = new[] { ("light", "Light"), ("medium", "Medium"), ("dark", "Dark"), ("deep", "Deep") };
+    var hair = new[] { ("moustache", "Moustache"), ("beard", "Beard"), ("clean", "Clean-shaven") };
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Settings · Command console</h1>
+        <div class="cr-sub cr-upper">Saved on this device as you change them · <span id="saved-tag" class="cr-saved" role="status">✔ Saved</span></div>
+    </div>
+    <button type="button" class="cr-btn" data-test="reset">Reset to defaults</button>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        @* ───── Sound ───── *@
+        <section class="cr-panel" aria-labelledby="h-sound">
+            <div class="cr-label"><span id="h-sound">Sound</span><span class="hint">all sounds are made live in your browser</span></div>
+
+            <div class="cr-set-row">
+                <label class="lbl" for="s-sound">Sound</label>
+                <div class="form-check form-switch m-0"><input id="s-sound" class="form-check-input" type="checkbox" role="switch" data-setting="sound" /></div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-master">Master volume</label>
+                <input id="s-master" class="form-range" type="range" min="0" max="100" step="5" data-setting="master" data-needs="sound" />
+                <output class="val" data-out="master" for="s-master"></output>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-music-on">Background music</label>
+                <div class="form-check form-switch m-0"><input id="s-music-on" class="form-check-input" type="checkbox" role="switch" data-setting="musicOn" data-needs="sound" /></div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-music">Music volume</label>
+                <input id="s-music" class="form-range" type="range" min="0" max="100" step="5" data-setting="music" data-needs="sound musicOn" />
+                <output class="val" data-out="music" for="s-music"></output>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-effects">Effects volume</label>
+                <input id="s-effects" class="form-range" type="range" min="0" max="100" step="5" data-setting="effects" data-needs="sound" />
+                <output class="val" data-out="effects" for="s-effects"></output>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button type="button" class="cr-btn sm" data-test="click">▶ Click</button>
+                <button type="button" class="cr-btn sm" data-test="conquer">▶ Conquest</button>
+                <button type="button" class="cr-btn sm green" data-test="victory">▶ Victory</button>
+                <button type="button" class="cr-btn sm red" data-test="defeat">▶ Defeat</button>
+            </div>
+        </section>
+
+        @* ───── Vibration ───── *@
+        <section class="cr-panel" aria-labelledby="h-vibe">
+            <div class="cr-label"><span id="h-vibe">Vibration</span><span class="hint">phones only</span></div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-vibe">Vibrate on win / loss</label>
+                <div class="form-check form-switch m-0"><input id="s-vibe" class="form-check-input" type="checkbox" role="switch" data-setting="vibration" /></div>
+                <button type="button" class="cr-btn sm" data-test="vibrate" data-needs="vibration">Test</button>
+            </div>
+            <p class="small cr-muted mb-0 mt-2" id="vibe-status"></p>
+        </section>
+
+        @* ───── Display ───── *@
+        <section class="cr-panel" aria-labelledby="h-display">
+            <div class="cr-label"><span id="h-display">Display</span></div>
+            <div class="cr-set-row">
+                <span class="lbl" id="l-theme">Theme</span>
+                <div class="cr-choice" role="radiogroup" aria-labelledby="l-theme">
+                    <input type="radio" name="theme" id="t-dark" value="dark" data-theme-choice /><label for="t-dark">☾ Dark</label>
+                    <input type="radio" name="theme" id="t-light" value="light" data-theme-choice /><label for="t-light">☀ Light</label>
+                </div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-bright">Brightness</label>
+                <input id="s-bright" class="form-range" type="range" min="60" max="140" step="5" data-setting="brightness" />
+                <output class="val" data-out="brightness" for="s-bright"></output>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-scan">CRT scanlines</label>
+                <div class="form-check form-switch m-0"><input id="s-scan" class="form-check-input" type="checkbox" role="switch" data-setting="scanlines" /></div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <span class="lbl" id="l-text">Text size</span>
+                <div class="cr-choice" role="radiogroup" aria-labelledby="l-text">
+                    @foreach (var (v, label) in textSizes)
+                    {
+                        <input type="radio" name="textSize" id="ts-@v" value="@v" data-setting="textSize" /><label for="ts-@v">@label</label>
+                    }
+                </div>
+                <span></span>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-lg-6">
+        @* ───── Gameplay ───── *@
+        <section class="cr-panel" aria-labelledby="h-game">
+            <div class="cr-label"><span id="h-game">Gameplay</span></div>
+            <div class="cr-set-row">
+                <span class="lbl" id="l-speed">Default fast-forward</span>
+                <div class="cr-choice" role="radiogroup" aria-labelledby="l-speed">
+                    @foreach (var n in new[] { 1, 2, 4 })
+                    {
+                        <input type="radio" name="speed" id="sp-@n" value="@n" data-speed-choice /><label for="sp-@n">@(n)×</label>
+                    }
+                </div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <span class="lbl" id="l-dice">Dice animation</span>
+                <div class="cr-choice" role="radiogroup" aria-labelledby="l-dice">
+                    @foreach (var (v, label) in diceModes)
+                    {
+                        <input type="radio" name="dice" id="dm-@v" value="@v" data-setting="dice" /><label for="dm-@v">@label</label>
+                    }
+                </div>
+                <span></span>
+            </div>
+            <div class="cr-screen p-3 mt-2">
+                <div class="d-flex align-items-center justify-content-center gap-3" id="dice-preview">
+                    <span class="cr-die" data-value="6" style="color:var(--cr-green)"></span>
+                    <span class="cr-die won" data-value="5" style="color:var(--cr-green)"></span>
+                    <span class="cr-amber fw-bold">VS</span>
+                    <span class="cr-die" data-value="3" style="color:var(--cr-red)"></span>
+                    <span class="cr-die" data-value="2" style="color:var(--cr-red)"></span>
+                </div>
+                <div class="text-center mt-3"><button type="button" class="cr-btn red" data-test="dice">🎲 Roll test dice</button></div>
+                <p class="small cr-muted text-center mb-0 mt-2">In a game the server rolls the dice; the animation only shows its result.</p>
+            </div>
+        </section>
+
+        @* ───── The General ───── *@
+        <section class="cr-panel" aria-labelledby="h-general">
+            <div class="cr-label"><span id="h-general">Your general</span><span class="hint">your avatar in every game</span></div>
+            <div class="cr-screen p-3 mb-2 cr-general-panel">
+                <div class="cr-general" data-general data-name="@(User.Identity?.IsAuthenticated == true ? User.Identity!.Name : "Commander")"
+                     style="--pc:var(--cr-green)" data-state="salute" data-line="Reporting for duty, Commander!"></div>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="cr-btn sm" data-test="salute">Salute</button>
+                    <button type="button" class="cr-btn sm" data-test="order">Order attack</button>
+                    <button type="button" class="cr-btn sm green" data-test="cheer">Cheer</button>
+                    <button type="button" class="cr-btn sm" data-test="sad">Defeated</button>
+                </div>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-gen">Show the general</label>
+                <div class="form-check form-switch m-0"><input id="s-gen" class="form-check-input" type="checkbox" role="switch" data-setting="general" /></div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <label class="lbl" for="s-gen-voice">Voice blips</label>
+                <div class="form-check form-switch m-0"><input id="s-gen-voice" class="form-check-input" type="checkbox" role="switch" data-setting="generalVoice" data-needs="general" /></div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <span class="lbl" id="l-skin">Skin tone</span>
+                <div class="cr-choice" role="radiogroup" aria-labelledby="l-skin">
+                    @foreach (var (v, label) in skins)
+                    {
+                        <input type="radio" name="generalSkin" id="sk-@v" value="@v" data-setting="generalSkin" /><label for="sk-@v">@label</label>
+                    }
+                </div>
+                <span></span>
+            </div>
+            <div class="cr-set-row">
+                <span class="lbl" id="l-hair">Facial hair</span>
+                <div class="cr-choice" role="radiogroup" aria-labelledby="l-hair">
+                    @foreach (var (v, label) in hair)
+                    {
+                        <input type="radio" name="generalHair" id="hr-@v" value="@v" data-setting="generalHair" /><label for="hr-@v">@label</label>
+                    }
+                </div>
+                <span></span>
+            </div>
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/settings-page.js" asp-append-version="true"></script>
+}

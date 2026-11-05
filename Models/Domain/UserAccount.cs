@@ -1,14 +1,27 @@
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 namespace GeoConquest.Models.Domain;
 
+/// <summary>Whether an account may log in.</summary>
+public enum AccountStatus
+{
+    Active,
+    Suspended
+}
+
 /// <summary>
 /// A registered commander. Stored in its own "users" collection (accounts outlive games).
 /// The password is never stored, only a salted PBKDF2 hash produced by ASP.NET Core's PasswordHasher.
+/// Every change goes through a method that checks the rules, so the stored state is always valid.
 /// </summary>
 public sealed class UserAccount
 {
     public const string PlayerRole = "Player";
+    public const string AdminRole = "Admin";
+
+    /// <summary>Version of the POPIA privacy notice. Raising it asks every user to consent again.</summary>
+    public const string CurrentConsentVersion = "2026-11";
 
     private static readonly Regex UsernamePattern = new("^[A-Za-z0-9_]{3,20}$", RegexOptions.Compiled);
     private static readonly Regex EmailPattern = new(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.Compiled);
@@ -28,16 +41,50 @@ public sealed class UserAccount
 
     public string PasswordHash { get; private set; } = string.Empty;
 
+    /// <summary>Player, or Admin (admins can also play).</summary>
     public string Role { get; private set; } = PlayerRole;
 
     public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime? LastLoginAtUtc { get; private set; }
 
+    // ── Status (admin control) ──────────────────────────────────────────────
+    public AccountStatus Status { get; private set; } = AccountStatus.Active;
+
+    public DateTime? SuspendedAtUtc { get; private set; }
+
+    public string? SuspensionReason { get; private set; }
+
+    public string? SuspendedBy { get; private set; }
+
+    /// <summary>
+    /// Changes whenever the password, role or status changes. The sign-in cookie carries a copy;
+    /// when they no longer match, the cookie is rejected, so old sessions end straight away.
+    /// </summary>
+    public string SecurityStamp { get; private set; } = string.Empty;
+
+    // ── POPIA consent ───────────────────────────────────────────────────────
+    public string? ConsentVersion { get; private set; }
+
+    public DateTime? ConsentGivenAtUtc { get; private set; }
+
+    // ── Password reset (only a hash of the emailed token is stored) ─────────
+    public string? PasswordResetTokenHash { get; private set; }
+
+    public DateTime? PasswordResetExpiresUtc { get; private set; }
+
+    public DateTime? PasswordChangedAtUtc { get; private set; }
+
     // Required by the MongoDB serializer; not usable by application code.
     private UserAccount()
     {
     }
+
+    public bool IsAdmin => Role == AdminRole;
+
+    public bool IsSuspended => Status == AccountStatus.Suspended;
+
+    public bool HasCurrentConsent => ConsentVersion == CurrentConsentVersion;
 
     public static UserAccount Register(string username, string email, string displayName)
     {
@@ -61,11 +108,24 @@ public sealed class UserAccount
             NormalizedEmail = Normalize(email),
             DisplayName = displayName,
             Role = PlayerRole,
+            Status = AccountStatus.Active,
+            SecurityStamp = NewStamp(),
             CreatedAtUtc = DateTime.UtcNow
         };
     }
 
     public static string Normalize(string value) => (value ?? string.Empty).Trim().ToUpperInvariant();
+
+    private static string NewStamp() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+
+    /// <summary>Accounts created before security stamps existed get one on their next login.</summary>
+    public bool EnsureSecurityStamp()
+    {
+        if (!string.IsNullOrEmpty(SecurityStamp))
+            return false;
+        SecurityStamp = NewStamp();
+        return true;
+    }
 
     /// <summary>Stores a hash produced by the password hasher (never a plain-text password).</summary>
     public void SetPasswordHash(string passwordHash)
@@ -77,4 +137,89 @@ public sealed class UserAccount
     }
 
     public void RecordLogin() => LastLoginAtUtc = DateTime.UtcNow;
+
+    // ── POPIA ───────────────────────────────────────────────────────────────
+
+    /// <summary>Records that the user accepted the current privacy notice.</summary>
+    public void RecordConsent()
+    {
+        ConsentVersion = CurrentConsentVersion;
+        ConsentGivenAtUtc = DateTime.UtcNow;
+    }
+
+    // ── Password reset ──────────────────────────────────────────────────────
+
+    /// <summary>Starts a reset: stores the token's hash and when it expires. A new request replaces the old token.</summary>
+    public void BeginPasswordReset(string tokenHash, TimeSpan lifetime)
+    {
+        if (string.IsNullOrWhiteSpace(tokenHash))
+            throw new DomainException("A reset token is required.");
+        if (lifetime <= TimeSpan.Zero || lifetime > TimeSpan.FromHours(24))
+            throw new DomainException("Reset links last between a few minutes and a day.");
+
+        PasswordResetTokenHash = tokenHash;
+        PasswordResetExpiresUtc = DateTime.UtcNow.Add(lifetime);
+    }
+
+    /// <summary>True if this token hash matches the stored one and has not expired. Compared in constant time.</summary>
+    public bool IsPasswordResetValid(string tokenHash)
+    {
+        if (string.IsNullOrEmpty(PasswordResetTokenHash) || PasswordResetExpiresUtc is null ||
+            PasswordResetExpiresUtc < DateTime.UtcNow || string.IsNullOrEmpty(tokenHash))
+            return false;
+
+        var stored = System.Text.Encoding.ASCII.GetBytes(PasswordResetTokenHash);
+        var given = System.Text.Encoding.ASCII.GetBytes(tokenHash);
+        return stored.Length == given.Length && CryptographicOperations.FixedTimeEquals(stored, given);
+    }
+
+    /// <summary>Sets the new password, uses up the token and signs the user out everywhere.</summary>
+    public void CompletePasswordReset(string newPasswordHash)
+    {
+        SetPasswordHash(newPasswordHash);
+        PasswordResetTokenHash = null;
+        PasswordResetExpiresUtc = null;
+        PasswordChangedAtUtc = DateTime.UtcNow;
+        SecurityStamp = NewStamp();
+    }
+
+    // ── Admin control ───────────────────────────────────────────────────────
+
+    public void Suspend(string reason, string byUsername)
+    {
+        reason = (reason ?? string.Empty).Trim();
+        if (reason.Length is < 3 or > 200)
+            throw new DomainException("Give a reason for the suspension (3–200 characters).");
+        if (IsSuspended)
+            throw new DomainException("This account is already suspended.");
+
+        Status = AccountStatus.Suspended;
+        SuspensionReason = reason;
+        SuspendedBy = byUsername;
+        SuspendedAtUtc = DateTime.UtcNow;
+        SecurityStamp = NewStamp();          // ends every open session
+    }
+
+    public void Reactivate()
+    {
+        if (!IsSuspended)
+            throw new DomainException("This account is not suspended.");
+
+        Status = AccountStatus.Active;
+        SuspensionReason = null;
+        SuspendedBy = null;
+        SuspendedAtUtc = null;
+        SecurityStamp = NewStamp();
+    }
+
+    public void SetRole(string role)
+    {
+        if (role is not (PlayerRole or AdminRole))
+            throw new DomainException("Unknown role.");
+        if (Role == role)
+            return;
+
+        Role = role;
+        SecurityStamp = NewStamp();          // they log in again with the new rights
+    }
 }

@@ -65,6 +65,66 @@ public sealed class MongoGameRepository : IGameRepository
         return games.AsReadOnly();
     }
 
+    public async Task<IReadOnlyList<GameSession>> ListForStatsAsync(DateTime? createdSinceUtc = null, int limit = 2000,
+        CancellationToken cancellationToken = default)
+    {
+        var f = Builders<GameSession>.Filter;
+        var filter = createdSinceUtc is null ? f.Empty : f.Gte(g => g.CreatedAtUtc, createdSinceUtc.Value);
+
+        var games = await _games
+            .Find(filter)
+            .Project<GameSession>(Builders<GameSession>.Projection.Slice("events", 1))
+            .SortByDescending(g => g.UpdatedAtUtc)
+            .Limit(Math.Clamp(limit, 1, 5000))
+            .ToListAsync(cancellationToken);
+
+        return games.AsReadOnly();
+    }
+
+    public async Task<IReadOnlyList<GameSession>> ListFullAsync(string? ownerUserId, IReadOnlyCollection<string>? ids = null,
+        int limit = 40, CancellationToken cancellationToken = default)
+    {
+        var f = Builders<GameSession>.Filter;
+        var filter = f.Empty;
+        if (!string.IsNullOrWhiteSpace(ownerUserId))
+            filter &= f.Eq(g => g.OwnerUserId, ownerUserId);
+        if (ids is not null)
+            filter &= f.In(g => g.Id, ids);
+
+        var games = await _games
+            .Find(filter)
+            .SortByDescending(g => g.UpdatedAtUtc)
+            .Limit(Math.Clamp(limit, 1, 200))
+            .ToListAsync(cancellationToken);
+
+        return games.AsReadOnly();
+    }
+
+    public async Task<IReadOnlyDictionary<string, int>> CountByOwnersAsync(IReadOnlyCollection<string> ownerUserIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (ownerUserIds is null || ownerUserIds.Count == 0)
+            return new Dictionary<string, int>();
+
+        // One grouped query for the whole page of accounts, not one query per account.
+        var rows = await _games.Aggregate()
+            .Match(Builders<GameSession>.Filter.In(g => g.OwnerUserId, ownerUserIds))
+            .Group(g => g.OwnerUserId, grp => new { Owner = grp.Key, Count = grp.Count() })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(r => r.Owner, r => r.Count);
+    }
+
+    public async Task<long> DeleteByOwnerAsync(string ownerUserId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(ownerUserId))
+            return 0;
+
+        var result = await _games.DeleteManyAsync(g => g.OwnerUserId == ownerUserId, cancellationToken);
+        _logger.LogInformation("Deleted {Count} games owned by user {UserId}", result.DeletedCount, ownerUserId);
+        return result.DeletedCount;
+    }
+
     public async Task InsertAsync(GameSession session, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(session);

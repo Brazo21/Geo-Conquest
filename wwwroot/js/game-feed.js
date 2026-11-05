@@ -20,6 +20,8 @@
     let feed = null;                         // latest GameFeedDto
 
     const playersById = Object.fromEntries(cfg.players.map(p => [p.id, p]));
+    // Who owns each country right now, so effects can tell when one of *your* countries is hit.
+    const owners = Object.fromEntries(cfg.countries.map(c => [c.code, c.ownerId]));
 
     // ── Speed controls (there may be one set per layout) ───────────────────
     function paintSpeed() {
@@ -62,6 +64,7 @@
     function applyBoard(board) {
         const entries = decodeBoard(board);
         if (!entries.length) return;
+        entries.forEach(x => { owners[x.code] = x.ownerId; });
 
         window.geoMap?.update(entries);
 
@@ -86,6 +89,8 @@
             const card = document.querySelector(`.cr-card[data-player="${id}"]`);
             if (card) {
                 card.querySelector('[data-f="countries"]').textContent = t.countries;
+                const word = card.querySelector('[data-f="countries-word"]');
+                if (word) word.textContent = t.countries === 1 ? 'country' : 'countries';
                 card.querySelector('[data-f="soldiers"]').textContent = t.soldiers;
                 card.classList.toggle('out', t.countries === 0);
                 if (t.countries === 0) card.querySelector('[data-f="state"]').textContent = 'Eliminated';
@@ -150,12 +155,13 @@
             const dv = e.defenderDice[i];
             const verdict = av > dv ? 'Attacker wins' : dv > av ? 'Defender wins' : 'Tie';
             return `<div class="d-flex align-items-center gap-2 mb-2">
-                        <span class="cr-die sm roll ${av > dv ? 'won' : ''}" style="color:${a}"><span>${av}</span></span>
+                        <span class="cr-die sm roll ${av > dv ? 'won' : ''}" data-value="${Number(av)}" style="color:${a}"><span>${av}</span></span>
                         <span class="cr-muted small">vs</span>
-                        <span class="cr-die sm roll ${dv > av ? 'won' : ''}" style="color:${d}"><span>${dv}</span></span>
+                        <span class="cr-die sm roll ${dv > av ? 'won' : ''}" data-value="${Number(dv)}" style="color:${d}"><span>${dv}</span></span>
                         <span class="small cr-upper ms-1">${verdict}</span>
                     </div>`;
         }).join('') + `<div class="small cr-muted mt-1">${esc(e.message)}</div>`;
+        window.geoDice?.upgrade(box);
     }
 
     function showDecision(e) {
@@ -199,6 +205,7 @@
     }
 
     function show(e) {
+        const prevOwnerId = owners[e.to];
         const round = $('round-label');
         if (round) round.textContent = `Round ${e.round}`;
         if (e.type === 'TurnStarted') markCurrent(e.actor);
@@ -213,17 +220,20 @@
         showBanner(e);
 
         const actor = feedPlayer(e.actor);
+        window.dispatchEvent(new CustomEvent('geo:event', { detail: { e, actor, prevOwnerId } }));
         setSim(true, actor && !actor.isHuman ? `NPC simulation active · ${actor.name.split(' · ')[0]}` : 'Simulation active');
     }
 
     // ── Playback ───────────────────────────────────────────────────────────
     function delayFor(e) {
         const actor = feedPlayer(e.actor);
+        // Dice need time to tumble and land before the next event replaces them.
+        const diceMs = e.type === 'DiceRolled' && window.geoDice ? window.geoDice.durationMs(speed) + 350 : 0;
         // Your own move was already seen on screen when you made it: show it, don't make you wait.
-        if (actor?.isHuman && !cfg.isSpectator) return 250;
+        if (actor?.isHuman && !cfg.isSpectator) return Math.max(250, diceMs);
         const weight = e.type === 'DiceRolled' || e.type === 'CountryConquered' || e.type === 'PlayerEliminated'
             || e.type === 'GameWon' || e.type === 'GameLost' ? 1.0 : e.reasoning ? 0.95 : 0.5;
-        return (BASE_DELAY_MS * weight) / speed;
+        return Math.max((BASE_DELAY_MS * weight) / speed, diceMs);
     }
 
     async function play() {

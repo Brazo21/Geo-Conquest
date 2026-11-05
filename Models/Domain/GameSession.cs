@@ -47,6 +47,9 @@ public sealed class GameSession
 
     public string? WinnerPlayerId { get; private set; }
 
+    /// <summary>The country the human chose at the start (used by the leaderboard and analytics).</summary>
+    public string? StartingCountryCode { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime UpdatedAtUtc { get; private set; }
@@ -107,6 +110,7 @@ public sealed class GameSession
         {
             Id = Guid.NewGuid().ToString("N"),
             OwnerUserId = ownerUserId,
+            StartingCountryCode = countryList.First(c => c.IsOwnedBy(humans[0].PlayerId)).Code,
             Status = GameStatus.Setup,
             Round = 0,
             Phase = TurnPhase.NotStarted,
@@ -171,6 +175,22 @@ public sealed class GameSession
 
     public IReadOnlyList<Player> GetActivePlayers() =>
         _players.Where(p => !p.IsEliminated).OrderBy(p => p.TurnOrder).ToList().AsReadOnly();
+
+    /// <summary>
+    /// The human's starting country. Games created before this was stored recover it from the
+    /// first event's board snapshot.
+    /// </summary>
+    public string? GetStartingCountryCode()
+    {
+        if (StartingCountryCode is not null)
+            return StartingCountryCode;
+
+        int humanIndex = _players.FindIndex(p => p.IsHuman());
+        var first = _events.OrderBy(e => e.Sequence).FirstOrDefault();
+        return first?.ReadBoard().FirstOrDefault(b => b.OwnerIndex == humanIndex)?.Code;
+    }
+
+    public int IndexOfPlayer(string playerId) => _players.FindIndex(p => p.PlayerId == playerId);
 
     public int GetTotalSoldiers(string playerId) =>
         _countries.Where(c => c.IsOwnedBy(playerId)).Sum(c => c.SoldierCount);

@@ -1,0 +1,230 @@
+@model AnalyticsViewModel
+@{
+    ViewData["Title"] = "Analytics";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Analytics</h1>
+        <div class="cr-sub cr-upper">Commander @Model.Commander · your last @Model.Games campaign@(Model.Games == 1 ? "" : "s")</div>
+    </div>
+</div>
+
+<nav class="cr-tabs" aria-label="Analytics views">
+    <a class="@(Model.Tab == AnalyticsViewModel.TabMe ? "active" : "")" asp-action="Analytics" asp-route-tab="me">My record &amp; replay</a>
+    <a class="@(Model.Tab == AnalyticsViewModel.TabNpc ? "active" : "")" asp-action="Analytics" asp-route-tab="npc">NPC profiles</a>
+</nav>
+
+@if (Model.Tab == AnalyticsViewModel.TabNpc)
+{
+    <div class="row g-3 mb-3">
+        @foreach (var p in Model.Personalities)
+        {
+            string color = p.Profile switch
+            {
+                NpcProfile.Aggressor => "var(--cr-red)",
+                NpcProfile.Defender => "var(--cr-blue)",
+                _ => "var(--cr-purple)"
+            };
+            <div class="col-lg-4">
+                <div class="cr-panel h-100" style="border-color:@color">
+                    <div class="cr-label"><span style="color:@color">@p.Title</span></div>
+                    <p class="small mb-3">@p.Description</p>
+                    <div class="cr-bars">
+                        @foreach (var (label, value) in new[]
+                        {
+                            ("Aggression", p.Aggression),
+                            ("Caution", p.Caution),
+                            ("Greed", p.Greed),
+                            ("Min. odds to attack", (int)Math.Round(p.MinAttackOdds * 100)),
+                            ("Retreat below", (int)Math.Round(p.RetreatAt * 100))
+                        })
+                        {
+                            <div class="row-bar" style="--pc:@color;grid-template-columns:9rem 1fr 2.2rem">
+                                <span class="nm" style="color:var(--cr-text)">@label</span>
+                                <div class="track"><div class="fill" style="width:@value%"></div></div>
+                                <span class="val">@value</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="cr-panel h-100">
+                <div class="cr-label"><span>How an NPC thinks</span></div>
+                <ol class="mb-0 ps-3" style="line-height:2">
+                    <li><strong class="cr-amber">Scan</strong> every country it could attack, from every country strong enough to attack.</li>
+                    <li><strong class="cr-amber">Score</strong> each one: exact win odds × spoils (+ bonus for knocking a rival out) − risk of losing soldiers.</li>
+                    <li><strong class="cr-amber">Decide</strong>: attack the best target above its odds bar, else hold; keep rolling until odds drop below its retreat line.</li>
+                    <li><strong class="cr-amber">Reinforce &amp; fortify</strong>: stack soldiers where they create the best strike, and shore up the most threatened border.</li>
+                    <li><strong class="cr-amber">Explain</strong>: every move is logged with a one-sentence reason you can read in the game.</li>
+                </ol>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="cr-panel h-100">
+                <div class="cr-label"><span>War council ledger</span><span class="hint">latest NPC reasoning in your games</span></div>
+                @if (Model.WarCouncil.Count == 0)
+                {
+                    <p class="cr-sub mb-0">Play a campaign to hear the NPCs think.</p>
+                }
+                else
+                {
+                    <div class="cr-decisions">
+                        @foreach (var c in Model.WarCouncil)
+                        {
+                            <div class="d">
+                                <div class="who" style="color:@c.Color">[@c.Tag] @c.Message</div>
+                                <div class="why">Why: @c.Reason</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="cr-panel">
+                <div class="cr-label">
+                    <span>Replay @(Model.Replay is null ? "" : $"game #{Model.Replay.ShortId}") · territory over time</span>
+                    <span class="hint" id="replay-round-label"></span>
+                </div>
+
+                @if (Model.ReplayChoices.Count > 0)
+                {
+                    <form method="get" asp-action="Analytics" class="mb-3">
+                        <input type="hidden" name="tab" value="me" />
+                        <select name="game" class="form-select form-select-sm" aria-label="Choose a game to replay" data-autosubmit>
+                            @foreach (var choice in Model.ReplayChoices)
+                            {
+                                if (choice.Id == Model.Replay?.GameId)
+                                {
+                                    <option value="@choice.Id" selected>@choice.Label</option>
+                                }
+                                else
+                                {
+                                    <option value="@choice.Id">@choice.Label</option>
+                                }
+                            }
+                        </select>
+                    </form>
+                }
+
+                @if (Model.Replay is null || Model.Replay.Rounds.Count == 0)
+                {
+                    <div class="text-center py-5">
+                        <p class="cr-readout mb-3">No campaign to replay yet <span class="cr-cursor"></span></p>
+                        <a class="cr-btn green" asp-controller="Games" asp-action="New">Start a campaign</a>
+                    </div>
+                }
+                else
+                {
+                    <div class="cr-screen">
+                        <div id="territory-chart" class="d-flex align-items-stretch gap-1" style="height:15rem" role="img"
+                             aria-label="Stacked columns: how many of the 10 countries each commander held at the end of every round"></div>
+                    </div>
+                    <div class="cr-map-legend" id="replay-legend"></div>
+                }
+            </div>
+
+            @if (Model.Replay is not null && Model.Replay.Rounds.Count > 0)
+            {
+                <div class="row g-3 mt-0">
+                    <div class="col-md-7">
+                        <div class="cr-panel h-100">
+                            <div class="cr-label"><span>Playback</span></div>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                                <button type="button" class="cr-btn sm" id="rp-prev" aria-label="Previous round">◀</button>
+                                <button type="button" class="cr-btn sm green" id="rp-play" aria-label="Play">▶ Play</button>
+                                <button type="button" class="cr-btn sm" id="rp-next" aria-label="Next round">▶|</button>
+                                <div class="cr-progress flex-grow-1" style="min-width:6rem"><div id="rp-progress" style="width:0%;background:var(--cr-amber)"></div></div>
+                                <span class="btn-group" role="group" aria-label="Replay speed">
+                                    <button type="button" class="cr-btn sm" data-rp-speed="1">1×</button>
+                                    <button type="button" class="cr-btn sm active" data-rp-speed="2">2×</button>
+                                    <button type="button" class="cr-btn sm" data-rp-speed="4">4×</button>
+                                </span>
+                            </div>
+                            <table class="cr-table" style="font-size:.78rem"><tbody id="rp-ledger"></tbody></table>
+                            <div class="mt-3">
+                                <a class="cr-btn sm" asp-controller="Games" asp-action="Play" asp-route-id="@Model.Replay.GameId">Open this game →</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="cr-panel h-100">
+                            <div class="cr-label"><span>Key moments</span><span class="hint">click to jump</span></div>
+                            @if (Model.Replay.KeyMoments.Count == 0)
+                            {
+                                <p class="cr-sub mb-0">No conquests yet in this campaign.</p>
+                            }
+                            else
+                            {
+                                <div class="cr-log" style="max-height:18rem">
+                                    @foreach (var m in Model.Replay.KeyMoments)
+                                    {
+                                        <button type="button" class="entry d-block w-100 text-start bg-transparent border-0 border-start @(m.Good ? "cr-green" : "cr-red")"
+                                                style="border-left:2px solid currentColor !important" data-jump="@m.Round">
+                                            R@(m.Round) · @m.Text
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="col-xl-4">
+            <div class="row g-2 mb-3">
+                @foreach (var (value, label) in new[]
+                {
+                    (Model.Games.ToString(), "Games"),
+                    (Model.Wins.ToString(), "Wins"),
+                    (Model.AverageRounds.ToString("0.#"), "Avg rounds"),
+                    (Model.Conquered.ToString(), "Conquered")
+                })
+                {
+                    <div class="col-3">
+                        <div class="cr-panel text-center px-1 py-2 h-100">
+                            <div class="cr-digits cr-amber" style="font-size:2.6rem">@value</div>
+                            <div class="cr-upper" style="font-size:.62rem;color:var(--cr-muted)">@label</div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="cr-panel">
+                <div class="cr-label"><span>Battle stats · my record</span></div>
+                <div class="small cr-upper" style="line-height:2">
+                    <div>Battles fought <span class="float-end cr-amber">@Model.BattlesFought</span></div>
+                    <div>Dice duels won <span class="float-end cr-amber">@(Model.DuelsDecided == 0 ? "—" : Model.DuelWinRate.ToString("P0"))</span></div>
+                    <div>Best streak <span class="float-end cr-amber">@Model.BestStreak duel@(Model.BestStreak == 1 ? "" : "s")</span></div>
+                    <div>Luckiest roll <span class="float-end cr-green">@(Model.LuckiestRoll ?? "—")</span></div>
+                </div>
+                <p class="cr-sub mt-2 mb-0" style="font-size:.7rem">Counts every duel you fought, attacking or defending. Ties are left out.</p>
+            </div>
+
+            <div class="cr-panel">
+                <div class="cr-label"><span>Global · win rate by start</span></div>
+                <partial name="_RateBars" model="Model.GlobalWinRateByStart" />
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    @if (Model.Tab == AnalyticsViewModel.TabMe && Model.Replay is not null && Model.Replay.Rounds.Count > 0)
+    {
+        <script nonce="@Context.CspNonce()">window.geoReplay = @Json.Serialize(Model.Replay);</script>
+        <script src="~/js/replay.js" asp-append-version="true"></script>
+    }
+}

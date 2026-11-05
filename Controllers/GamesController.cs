@@ -2,6 +2,7 @@ using System.Security.Claims;
 using GeoConquest.Models.Domain;
 using GeoConquest.Models.ViewModels;
 using GeoConquest.Repositories;
+using GeoConquest.Security;
 using GeoConquest.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -35,6 +36,7 @@ public sealed class GamesController : Controller
     public async Task<IActionResult> Index(string? scope, string? search, GameStatus? status, CancellationToken cancellationToken)
     {
         bool loggedIn = User.Identity?.IsAuthenticated == true;
+        search = InputGuard.CleanSearch(search);
         scope = scope?.ToLowerInvariant() switch
         {
             GameListViewModel.ScopeMine when loggedIn => GameListViewModel.ScopeMine,
@@ -68,6 +70,9 @@ public sealed class GamesController : Controller
     [AllowAnonymous]
     public async Task<IActionResult> Play(string id, long? replay, CancellationToken cancellationToken)
     {
+        if (!InputGuard.IsGameId(id))
+            return NotFound();
+
         try
         {
             var session = await _engine.GetGameAsync(id, cancellationToken);
@@ -95,6 +100,9 @@ public sealed class GamesController : Controller
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> Events(string id, long after, CancellationToken cancellationToken)
     {
+        if (!InputGuard.IsGameId(id))
+            return NotFound();
+
         var session = await _games.GetByIdAsync(id, cancellationToken);
         return session is null ? NotFound() : Json(GameFeedDto.From(session, after, CurrentUserId));
     }
@@ -162,6 +170,9 @@ public sealed class GamesController : Controller
     /// <summary>Runs one move and turns rule violations into a friendly message on the game page.</summary>
     private async Task<IActionResult> ExecuteMoveAsync(string id, Func<string, Task<MoveOutcome>> move)
     {
+        if (!InputGuard.IsGameId(id))
+            return NotFound();
+
         if (!ModelState.IsValid)
         {
             TempData["Error"] = ModelState.Values.SelectMany(v => v.Errors).First().ErrorMessage;

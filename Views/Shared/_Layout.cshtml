@@ -10,16 +10,38 @@
         controller == "Games" && (action == "Index" || action == "Play") ? "home" :
         controller == "Games" && action == "New" ? "new" :
         controller == "Home" && action == "HowToPlay" ? "how" :
+        controller == "Stats" && action == "Leaderboard" ? "board" :
+        controller == "Stats" && action == "Analytics" ? "analytics" :
+        controller == "Home" && action == "Settings" ? "settings" :
+        controller == "Admin" ? "admin" :
+        controller == "Account" && action == "MyData" ? "me" :
         controller == "Account" ? "account" : "";
 
     string Lit(string key) => active == key ? "active" : "";
+    bool isAdmin = User.IsInRole(UserAccount.AdminRole);
+    bool statsActive = active is "board" or "analytics";
+    bool meActive = active is "settings" or "admin" or "me";
 }
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="utf-8" />
+    <script nonce="@Context.CspNonce()">
+        // Apply the saved light/dark choice before the page paints (no flash).
+        try { const t = localStorage.getItem('geoconquest.theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch { }
+        // Same for brightness, scanlines and text size from the Settings page.
+        try {
+            const s = JSON.parse(localStorage.getItem('geoconquest.settings') || '{}'), r = document.documentElement;
+            const b = Number(s.brightness);
+            if (b >= 60 && b <= 140 && b !== 100) { r.style.setProperty('--cr-brightness', String(b / 100)); r.dataset.bright = '1'; }
+            if (s.scanlines === false) r.dataset.scanlines = 'off';
+            if (['sm', 'md', 'lg', 'xl'].includes(s.textSize)) r.dataset.text = s.textSize;
+        } catch { }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] · GeoConquest Command Room</title>
+    <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
+    <link rel="alternate icon" href="~/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet" />
@@ -30,7 +52,10 @@
 <body>
     <header class="cr-topbar">
         <nav class="container-fluid px-3 px-lg-4 d-flex flex-wrap align-items-center justify-content-between gap-2">
-            <a class="cr-brand" asp-controller="Home" asp-action="Index">GeoConquest · Command Room</a>
+            <a class="cr-brand d-flex align-items-center gap-2" asp-controller="Home" asp-action="Index" aria-label="GeoConquest home">
+                <partial name="_Logo" />
+                <span>GeoConquest<span class="d-none d-sm-inline"> · Command Room</span></span>
+            </a>
 
             <button class="navbar-toggler cr-toggler d-lg-none px-2 py-1" type="button" data-bs-toggle="collapse"
                     data-bs-target="#cr-menu" aria-controls="cr-menu" aria-expanded="false" aria-label="Toggle menu">MENU</button>
@@ -44,20 +69,45 @@
                     <li><a class="@Lit("live")" asp-controller="Games" asp-action="Index" asp-route-scope="live">Live Games</a></li>
                     @if (loggedIn)
                     {
-                        <li><a class="@Lit("new")" asp-controller="Games" asp-action="New">New Game</a></li>
-                    }
-                    <li><a class="@Lit("how")" asp-controller="Home" asp-action="HowToPlay">How To Play</a></li>
-                    @if (loggedIn)
-                    {
-                        <li><span class="cr-who px-2">Cmdr @User.Identity!.Name</span></li>
-                        <li>
-                            <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
-                                <button type="submit">Log Out</button>
-                            </form>
+                        <li class="dropdown">
+                            <button type="button" class="dropdown-toggle @(statsActive ? "active" : "")" data-bs-toggle="dropdown" aria-expanded="false">Stats</button>
+                            <ul class="dropdown-menu cr-menu">
+                                <li><a class="dropdown-item @Lit("board")" asp-controller="Stats" asp-action="Leaderboard">Leaderboard</a></li>
+                                <li><a class="dropdown-item @Lit("analytics")" asp-controller="Stats" asp-action="Analytics">My analytics</a></li>
+                            </ul>
                         </li>
                     }
                     else
                     {
+                        <li><a class="@Lit("board")" asp-controller="Stats" asp-action="Leaderboard">Leaderboard</a></li>
+                    }
+                    <li><a class="@Lit("how")" asp-controller="Home" asp-action="HowToPlay">How To Play</a></li>
+                    @if (loggedIn)
+                    {
+                        <li><a class="cr-signup @Lit("new")" asp-controller="Games" asp-action="New">+ New Game</a></li>
+                        <li class="dropdown">
+                            <button type="button" class="dropdown-toggle cr-who-btn @(meActive ? "active" : "")" data-bs-toggle="dropdown" aria-expanded="false">
+                                Cmdr @User.Identity!.Name@(isAdmin ? " ★" : "")
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end cr-menu">
+                                @if (isAdmin)
+                                {
+                                    <li><a class="dropdown-item @Lit("admin")" asp-controller="Admin" asp-action="Index">★ Admin panel</a></li>
+                                }
+                                <li><a class="dropdown-item @Lit("settings")" asp-controller="Home" asp-action="Settings">⚙ Settings</a></li>
+                                <li><a class="dropdown-item @Lit("me")" asp-controller="Account" asp-action="MyData">Your data</a></li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <form asp-controller="Account" asp-action="Logout" method="post">
+                                        <button type="submit" class="dropdown-item">Log out</button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
+                    }
+                    else
+                    {
+                        <li><a class="@Lit("settings")" asp-controller="Home" asp-action="Settings" aria-label="Settings">⚙</a></li>
                         <li><a class="@(action == "Login" ? "active" : "")" asp-controller="Account" asp-action="Login">Log In</a></li>
                         <li><a class="cr-signup @(action == "Register" ? "active" : "")" asp-controller="Account" asp-action="Register">Sign Up</a></li>
                     }
@@ -71,14 +121,14 @@
         {
             <div class="cr-alert ok" role="status">
                 <span>✔ @success</span>
-                <button type="button" onclick="this.parentElement.remove()" aria-label="Dismiss">×</button>
+                <button type="button" data-dismiss-alert aria-label="Dismiss">×</button>
             </div>
         }
         @if (TempData["Error"] is string error)
         {
             <div class="cr-alert err" role="alert">
                 <span>⚠ @error</span>
-                <button type="button" onclick="this.parentElement.remove()" aria-label="Dismiss">×</button>
+                <button type="button" data-dismiss-alert aria-label="Dismiss">×</button>
             </div>
         }
         @RenderBody()
@@ -86,14 +136,18 @@
 
     <footer class="cr-footer">
         <div class="container-fluid px-3 px-lg-4 d-flex flex-wrap justify-content-between gap-2">
-            <span>© 2026 GeoConquest · INF4001N</span>
+            <span>© 2026 GeoConquest</span>
             <span><a asp-controller="Home" asp-action="Privacy">Privacy</a></span>
         </div>
     </footer>
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/geo-settings.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/geo-audio.js" asp-append-version="true"></script>
+    <script src="~/js/dice.js" asp-append-version="true"></script>
+    <script src="~/js/general.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

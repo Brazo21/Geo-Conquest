@@ -1,0 +1,38 @@
+# Render Blueprint: Dashboard → New → Blueprint → pick this repo.
+# Values marked "sync: false" are secrets: Render asks for them once and never stores them in the repo.
+services:
+  - type: web
+    name: geoconquest
+    runtime: docker
+    plan: free
+    region: frankfurt          # closest Render region to South Africa
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: BehindProxy
+        value: "true"
+      - key: MongoDb__ConnectionString
+        sync: false
+      - key: Commentary__ApiKey
+        sync: false
+      - key: Admin__Username
+        sync: false
+      - key: Admin__Email
+        sync: false
+      - key: Admin__Password
+        sync: false
+      - key: Email__Provider
+        value: Brevo
+      - key: Email__ApiKey
+        sync: false
+      - key: Email__FromAddress
+        sync: false
+      - key: Email__PublicBaseUrl
+        sync: false
+      - key: Privacy__InformationOfficer
+        sync: false
+      - key: Privacy__ContactEmail
+        sync: false

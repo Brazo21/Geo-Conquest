@@ -1,0 +1,61 @@
+@model MyDataViewModel
+@{
+    ViewData["Title"] = "Your data";
+    string Date(DateTime? d) => d is null ? "—" : d.Value.ToLocalTime().ToString("d MMM yyyy, HH:mm");
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Your data</h1>
+        <div class="cr-sub cr-upper">Everything GeoConquest holds about you · POPIA right of access</div>
+    </div>
+    <a asp-controller="Home" asp-action="Privacy" class="cr-btn">Privacy notice</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Personal information on file</span></div>
+            <table class="cr-table">
+                <tbody>
+                    <tr><th scope="row">Username</th><td>@Model.Username</td></tr>
+                    <tr><th scope="row">Commander name</th><td>@Model.DisplayName</td></tr>
+                    <tr><th scope="row">Email</th><td>@Model.Email</td></tr>
+                    <tr><th scope="row">Password</th><td>Stored only as a salted PBKDF2 hash (nobody can read it)</td></tr>
+                    <tr><th scope="row">Role</th><td>@Model.Role</td></tr>
+                    <tr><th scope="row">Account created</th><td>@Date(Model.CreatedAtUtc)</td></tr>
+                    <tr><th scope="row">Last login</th><td>@Date(Model.LastLoginAtUtc)</td></tr>
+                    <tr><th scope="row">Password last reset</th><td>@Date(Model.PasswordChangedAtUtc)</td></tr>
+                    <tr><th scope="row">POPIA consent</th><td>@(Model.ConsentGivenAtUtc is null ? "Not given yet" : $"Given {Date(Model.ConsentGivenAtUtc)} (notice v{Model.ConsentVersion})")</td></tr>
+                    <tr><th scope="row">Games</th><td>@Model.Games game@(Model.Games == 1 ? "" : "s") (board, dice and moves)</td></tr>
+                    <tr><th scope="row">On this device only</th><td>Sound, display and General settings (browser storage, never sent to us)</td></tr>
+                </tbody>
+            </table>
+            <p class="small cr-muted mt-3 mb-0">Something wrong? Your commander name and email can be corrected by the site administrator on request.</p>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="cr-panel h-100" style="border-color:var(--cr-red)">
+            <div class="cr-label"><span class="cr-red">Delete my account</span></div>
+            <p class="small">
+                This permanently deletes your account, your personal information and <strong>all @Model.Games of your games</strong>.
+                It can't be undone. Withdrawing your POPIA consent works the same way.
+            </p>
+            <form asp-action="DeleteMyAccount" method="post" novalidate>
+                <div asp-validation-summary="ModelOnly" class="mb-3"></div>
+                <div class="mb-3">
+                    <label asp-for="Delete.Password" class="form-label"></label>
+                    <input asp-for="Delete.Password" class="form-control" autocomplete="current-password" maxlength="100" />
+                    <span asp-validation-for="Delete.Password" class="small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Delete.Confirm" class="form-label"></label>
+                    <input asp-for="Delete.Confirm" class="form-control" placeholder="DELETE" maxlength="6" autocomplete="off" />
+                    <span asp-validation-for="Delete.Confirm" class="small"></span>
+                </div>
+                <button type="submit" class="cr-btn red w-100">Permanently delete everything</button>
+            </form>
+        </div>
+    </div>
+</div>

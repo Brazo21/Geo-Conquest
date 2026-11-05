@@ -112,6 +112,23 @@ public sealed class GameEvent
 
     public bool HasCommentary => !string.IsNullOrEmpty(Commentary);
 
+    /// <summary>Decodes <see cref="BoardSnapshot"/>: each country's code, owner (index into the game's players) and soldiers.</summary>
+    public IReadOnlyList<BoardEntry> ReadBoard()
+    {
+        if (string.IsNullOrEmpty(BoardSnapshot))
+            return Array.Empty<BoardEntry>();
+
+        var entries = new List<BoardEntry>();
+        foreach (string part in BoardSnapshot.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string[] bits = part.Split('.');
+            if (bits.Length == 3 && int.TryParse(bits[1], out int owner) && int.TryParse(bits[2], out int soldiers))
+                entries.Add(new BoardEntry(bits[0], owner, soldiers));
+        }
+
+        return entries;
+    }
+
     /// <summary>Battle events get commentary; bookkeeping events (reinforcing, turn starts) do not.</summary>
     public bool IsBattleEvent => Type is GameEventType.AttackStarted or GameEventType.DiceRolled
         or GameEventType.CountryConquered or GameEventType.AttackFailed or GameEventType.AttackRetreated
@@ -142,3 +159,6 @@ public sealed class GameEvent
         BoardSnapshot = boardSnapshot;
     }
 }
+
+/// <summary>One country in a board snapshot.</summary>
+public sealed record BoardEntry(string Code, int OwnerIndex, int Soldiers);

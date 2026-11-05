@@ -1,0 +1,109 @@
+@model AdminAccountRow
+@{
+    ViewData["Title"] = $"Admin · {Model.Username}";
+    string Date(DateTime? d) => d is null ? "—" : d.Value.ToLocalTime().ToString("d MMM yyyy, HH:mm");
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">@Model.DisplayName</h1>
+        <div class="cr-sub cr-upper">@@@Model.Username · @Model.Role · <span class="@(Model.IsSuspended ? "cr-red" : "cr-green")">@Model.Status</span></div>
+    </div>
+    <a asp-action="Index" class="cr-btn">← All accounts</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Account details</span></div>
+            <table class="cr-table">
+                <tbody>
+                    <tr><th scope="row">Email</th><td>@Model.Email</td></tr>
+                    <tr><th scope="row">Games</th><td>@Model.Games</td></tr>
+                    <tr><th scope="row">Joined</th><td>@Date(Model.CreatedAtUtc)</td></tr>
+                    <tr><th scope="row">Last login</th><td>@Date(Model.LastLoginAtUtc)</td></tr>
+                    <tr><th scope="row">Password last reset</th><td>@Date(Model.PasswordChangedAtUtc)</td></tr>
+                    <tr><th scope="row">POPIA consent</th><td>@(Model.HasCurrentConsent ? $"Given {Date(Model.ConsentGivenAtUtc)}" : "Pending (asked at next login)")</td></tr>
+                    @if (Model.IsSuspended)
+                    {
+                        <tr><th scope="row">Suspended</th><td class="cr-red">@Date(Model.SuspendedAtUtc) by @Model.SuspendedBy</td></tr>
+                        <tr><th scope="row">Reason</th><td>@Model.SuspensionReason</td></tr>
+                    }
+                </tbody>
+            </table>
+            <p class="small cr-muted mt-3 mb-0">Admins never see passwords. A reset link lets the user choose a new one themselves.</p>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        @if (Model.IsYou)
+        {
+            <div class="cr-panel">
+                <div class="cr-label"><span>Controls</span></div>
+                <p class="mb-0">This is your own account. To protect against lock-outs, another admin has to suspend, demote or delete it.
+                    You can manage your own data on <a asp-controller="Account" asp-action="MyData">Your data</a>.</p>
+            </div>
+        }
+        else
+        {
+            <div class="cr-panel">
+                <div class="cr-label"><span>Access</span></div>
+                @if (Model.IsSuspended)
+                {
+                    <form asp-action="Reactivate" asp-route-id="@Model.Id" method="post">
+                        <p class="small">They can log in again straight away.</p>
+                        <button type="submit" class="cr-btn green w-100">Reactivate account</button>
+                    </form>
+                }
+                else
+                {
+                    <form asp-action="Suspend" asp-route-id="@Model.Id" method="post">
+                        <label class="form-label" for="reason">Reason for suspension</label>
+                        <input id="reason" name="Reason" class="form-control mb-2" required minlength="3" maxlength="200"
+                               placeholder="e.g. Offensive commander name" />
+                        <p class="small cr-muted">They're signed out at once and see a "suspended" message if they try to log in.</p>
+                        <button type="submit" class="cr-btn red w-100">Suspend account</button>
+                    </form>
+                }
+            </div>
+
+            <div class="cr-panel">
+                <div class="cr-label"><span>Role & password</span></div>
+                @if (Model.IsSuspended && !Model.IsAdmin)
+                {
+                    <p class="small cr-muted mb-0">Reactivate the account to change its role or send a password reset link.</p>
+                }
+                <div class="d-grid gap-2">
+                    @if (Model.IsAdmin)
+                    {
+                        <form asp-action="RemoveAdmin" asp-route-id="@Model.Id" method="post" class="d-grid">
+                            <button type="submit" class="cr-btn">Remove admin rights</button>
+                        </form>
+                    }
+                    else if (!Model.IsSuspended)
+                    {
+                        <form asp-action="MakeAdmin" asp-route-id="@Model.Id" method="post" class="d-grid">
+                            <button type="submit" class="cr-btn">Make administrator</button>
+                        </form>
+                    }
+                    @if (!Model.IsSuspended)
+                    {
+                        <form asp-action="SendReset" asp-route-id="@Model.Id" method="post" class="d-grid">
+                            <button type="submit" class="cr-btn">Email a password reset link</button>
+                        </form>
+                    }
+                </div>
+            </div>
+
+            <div class="cr-panel" style="border-color:var(--cr-red)">
+                <div class="cr-label"><span class="cr-red">Delete account</span></div>
+                <form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+                    <p class="small">Permanently deletes this account and its @Model.Games game@(Model.Games == 1 ? "" : "s"). This can't be undone.</p>
+                    <label class="form-label" for="confirm">Type <strong>@Model.Username</strong> to confirm</label>
+                    <input id="confirm" name="ConfirmUsername" class="form-control mb-2" required maxlength="20" autocomplete="off" />
+                    <button type="submit" class="cr-btn red w-100">Delete permanently</button>
+                </form>
+            </div>
+        }
+    </div>
+</div>

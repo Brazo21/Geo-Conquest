@@ -1,0 +1,15 @@
+# Keep the build context small and free of local files.
+bin/
+obj/
+.vs/
+.git/
+.github/
+.claude-build/
+*.user
+*.suo
+**/*.swp
+appsettings.Development.json
+Dockerfile
+.dockerignore
+render.yaml
+README.md

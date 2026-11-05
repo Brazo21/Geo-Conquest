@@ -1,0 +1,42 @@
+@model ConsentViewModel
+@{
+    ViewData["Title"] = "Privacy consent";
+}
+
+<div class="row justify-content-center py-lg-4">
+    <div class="col-md-10 col-lg-7">
+        <div class="cr-panel cr-glow p-4">
+            <div class="cr-label"><span>POPIA · action required</span></div>
+            <h1 class="cr-title mb-2">Your consent, Commander</h1>
+            <p>
+                South Africa's Protection of Personal Information Act (POPIA) means we need your permission before we keep
+                processing your personal information. Please read the summary and accept to carry on playing.
+            </p>
+
+            <div class="cr-consent mb-3">
+                <ul class="small mb-2 ps-3" style="line-height:1.8">
+                    <li><strong>What:</strong> username, email, commander name, a hashed password, login times and your games.</li>
+                    <li><strong>Why:</strong> to log you in, reset your password and show your games and results.</li>
+                    <li><strong>Who sees it:</strong> other players see your commander name and games, never your email.</li>
+                    <li><strong>Your rights:</strong> see or delete everything at any time on <a asp-action="MyData">Your data</a>.</li>
+                </ul>
+                <a asp-controller="Home" asp-action="Privacy" target="_blank" rel="noopener" class="small">Read the full privacy notice ↗</a>
+            </div>
+
+            <form asp-action="Consent" method="post" novalidate>
+                <div asp-validation-summary="ModelOnly" class="mb-3"></div>
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div class="form-check mb-1">
+                    <input asp-for="Accept" class="form-check-input" />
+                    <label asp-for="Accept" class="form-check-label small">I have read the privacy notice and consent to GeoConquest processing my personal information for these purposes.</label>
+                </div>
+                <span asp-validation-for="Accept" class="small"></span>
+                <button type="submit" class="cr-btn green w-100 mt-3">Accept and continue</button>
+            </form>
+
+            <p class="cr-sub mt-4 mb-0">
+                Don't agree? You can <a asp-action="MyData">delete your account and data</a>, or log out. You can still watch games without an account.
+            </p>
+        </div>
+    </div>
+</div>

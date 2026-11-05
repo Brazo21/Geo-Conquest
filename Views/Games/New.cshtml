@@ -1,6 +1,8 @@
 @model NewGameViewModel
 @{
     ViewData["Title"] = "New game";
+    // Flag artwork: the open-source flag-icons set (MIT), pinned version, served from jsDelivr.
+    string Flag(string code) => $"https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/flags/4x3/{code.ToLowerInvariant()}.svg";
     var tiers = Model.Countries
         .GroupBy(c => c.SoldierValue)
         .OrderByDescending(g => g.Key);
@@ -18,11 +20,11 @@
 
     <div class="cr-console mb-3">
         <div class="row g-3 align-items-end">
-            <div class="col-md-6">
+            <div class="col-md-5">
                 <label for="country-search" class="form-label">Search countries</label>
                 <input id="country-search" type="search" class="form-control" placeholder="e.g. South Africa" autocomplete="off" />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-4">
                 <label asp-for="Input.NpcCount" class="form-label">NPC opponents</label>
                 <select asp-for="Input.NpcCount" class="form-select">
                     @for (int n = 9; n >= 1; n--)
@@ -32,10 +34,16 @@
                 </select>
             </div>
             <div class="col-md-3">
-                <button type="submit" class="cr-btn red w-100">Deploy · start game</button>
+                <div class="form-label">Your country</div>
+                <div id="picked" class="cr-screen py-2 px-3 cr-upper d-flex align-items-center" style="border-radius:4px;min-height:2.9rem" aria-live="polite">
+                    <span class="cr-muted">None yet: pick below</span>
+                </div>
             </div>
         </div>
-        <div id="picked" class="cr-upper small mt-3" style="color:#ece4cc">No country selected yet</div>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+            <button type="submit" class="cr-btn red lg" id="start-btn" disabled>Deploy · start game</button>
+            <span id="picked-hint" class="cr-upper small" style="color:#ece4cc">Choose a country to unlock the start button.</span>
+        </div>
         <span asp-validation-for="Input.CountryCode" class="d-block small mt-1"></span>
     </div>
 
@@ -49,13 +57,14 @@
                     <div class="col-6 col-md-4 col-xl-2 country-option" data-name="@country.Name.ToLowerInvariant()">
                         @if (Model.Input.CountryCode == country.Code)
                         {
-                            <input type="radio" name="Input.CountryCode" id="c-@country.Code" value="@country.Code" data-label="@country.Name · @country.SoldierValue soldiers" checked />
+                            <input type="radio" name="Input.CountryCode" id="c-@country.Code" value="@country.Code" data-label="@country.Name · @country.SoldierValue soldiers" data-flag="@Flag(country.Code)" checked />
                         }
                         else
                         {
-                            <input type="radio" name="Input.CountryCode" id="c-@country.Code" value="@country.Code" data-label="@country.Name · @country.SoldierValue soldiers" />
+                            <input type="radio" name="Input.CountryCode" id="c-@country.Code" value="@country.Code" data-label="@country.Name · @country.SoldierValue soldiers" data-flag="@Flag(country.Code)" />
                         }
                         <label for="c-@country.Code">
+                            <img class="cr-flag" src="@Flag(country.Code)" alt="" width="24" height="18" loading="lazy" />
                             <span class="fw-semibold">@country.Name</span><br />
                             <span class="pop">@country.Population.ToString("N0")</span>
                         </label>
@@ -67,7 +76,7 @@
 </form>
 
 @section Scripts {
-    <script>
+    <script nonce="@Context.CspNonce()">
         // Instant filter + selection readout. The server still validates the chosen country.
         (function () {
             const search = document.getElementById('country-search');
@@ -81,11 +90,23 @@
                     tier.classList.toggle('d-none', tier.querySelectorAll('.country-option:not(.d-none)').length === 0));
             });
 
+            const startBtn = document.getElementById('start-btn');
+            const hint = document.getElementById('picked-hint');
+
             function showPick() {
                 const r = document.querySelector('input[name="Input.CountryCode"]:checked');
-                picked.innerHTML = r
-                    ? `Selected: <span style="color:var(--cr-green)">${r.dataset.label}</span>`
-                    : 'No country selected yet';
+                if (r) {
+                    const name = r.dataset.label.split(' · ')[0];
+                    picked.innerHTML = `<img class="cr-flag lg" alt="" width="40" height="30" /><span class="cr-green fw-bold"></span>`;
+                    picked.querySelector('img').src = r.dataset.flag;
+                    picked.querySelector('img').alt = `Flag of ${name}`;
+                    picked.querySelector('span').textContent = r.dataset.label;
+                    startBtn.disabled = false;
+                    startBtn.textContent = `Deploy as ${name} ▶`;
+                    hint.textContent = 'Ready when you are, Commander.';
+                } else {
+                    startBtn.disabled = true;
+                }
             }
             document.querySelectorAll('input[name="Input.CountryCode"]').forEach(r => r.addEventListener('change', showPick));
             showPick();

@@ -1,17 +1,70 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Config
 @{
-    ViewData["Title"] = "Privacy";
+    ViewData["Title"] = "Privacy notice";
+    string officer = Config["Privacy:InformationOfficer"] is { Length: > 0 } o ? o : "the site administrator";
+    string contact = Config["Privacy:ContactEmail"] ?? string.Empty;
 }
 
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="cr-panel">
-            <div class="cr-label"><span>Privacy</span></div>
-            <h1 class="cr-title mb-3">Privacy policy</h1>
-            <ul class="ps-3" style="line-height:1.9">
-                <li>We store your username, email, commander name and a <strong class="cr-amber">hashed</strong> password (never the password itself).</li>
-                <li>Games are public to anyone with the link, so spectators can watch. Only you can play your games.</li>
-                <li>Battle details (not your personal details) are sent to an AI service to write live commentary.</li>
-                <li>One sign-in cookie keeps you logged in. No tracking or advertising cookies.</li>
+    <div class="col-lg-9">
+        <div class="cr-panel cr-popia">
+            <div class="cr-label"><span>POPIA privacy notice · version @UserAccount.CurrentConsentVersion</span></div>
+            <h1 class="cr-title mb-1">How GeoConquest handles your personal information</h1>
+            <p class="cr-sub mb-4">Written for the Protection of Personal Information Act 4 of 2013 (POPIA), South Africa.</p>
+
+            <h2>1 · Who is responsible</h2>
+            <p>
+                GeoConquest is a student project built for the University of Cape Town INF4001 entrance exam. The responsible party
+                and Information Officer is @officer@(string.IsNullOrEmpty(contact) ? "" : ","),
+                @if (!string.IsNullOrEmpty(contact))
+                {
+                    <a href="mailto:@contact">@contact</a>
+                }
+                else
+                {
+                    <span>reachable through the site administrator</span>
+                }.
+            </p>
+
+            <h2>2 · What we collect</h2>
+            <ul>
+                <li><strong>Account:</strong> username, email address, commander name, and your password as a salted PBKDF2 hash (never the password itself).</li>
+                <li><strong>Activity:</strong> when you signed up and last logged in, when you consented, and when your password was last reset.</li>
+                <li><strong>Games:</strong> the countries, soldiers, dice rolls and moves in games you play.</li>
+                <li><strong>Not collected:</strong> no ID numbers, phone numbers, location, payment details or special personal information.</li>
+            </ul>
+
+            <h2>3 · Why, and on what basis</h2>
+            <p>
+                Only to create and secure your account, let you play and replay games, email you password-reset links,
+                and show leaderboards and analytics. We rely on your <strong>consent</strong> (POPIA section 11(1)(a)),
+                which you give at sign-up and can withdraw at any time. We collect only what these purposes need (section 10).
+            </p>
+
+            <h2>4 · Who can see it</h2>
+            <ul>
+                <li>Games are public to anyone with the link, so spectators see your <strong>commander name</strong> and your moves. Your email and username are never shown.</li>
+                <li>The site administrator can see account details to keep the platform safe (for example to suspend abuse).</li>
+                <li>Battle details (countries and dice, never your personal information) are sent to an AI service to write live commentary.</li>
+                <li>Data is stored with MongoDB Atlas, a cloud database that may be hosted outside South Africa. Atlas is bound by data-protection terms that give protection comparable to POPIA (section 72).</li>
+                <li>We never sell your information or use it for marketing.</li>
+            </ul>
+
+            <h2>5 · How long we keep it</h2>
+            <p>Until you delete your account. Deleting it removes your personal information and your games straight away. Password-reset tokens expire after 30 minutes.</p>
+
+            <h2>6 · How we protect it</h2>
+            <p>Hashed passwords, HTTPS, signed-in cookies that scripts can't read, protection against forged requests, login rate limits, role-based access, and sessions that end immediately when a password is reset or an account suspended.</p>
+
+            <h2>7 · Cookies and browser storage</h2>
+            <p>Only essential cookies: one to keep you signed in and one that blocks forged form posts. Your sound, display and General settings stay in your own browser and are never sent to us. No tracking or advertising cookies.</p>
+
+            <h2>8 · Your rights</h2>
+            <ul>
+                <li><strong>Access:</strong> see everything we hold on <a asp-controller="Account" asp-action="MyData">Your data</a> (log in first).</li>
+                <li><strong>Correction:</strong> ask the Information Officer to fix your commander name or email.</li>
+                <li><strong>Deletion and withdrawing consent:</strong> delete your account yourself on the Your data page.</li>
+                <li><strong>Complaints:</strong> you may complain to the Information Regulator of South Africa, <a href="https://inforegulator.org.za/complaints/" target="_blank" rel="noopener">inforegulator.org.za/complaints</a>.</li>
             </ul>
         </div>
     </div>

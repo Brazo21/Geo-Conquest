@@ -1,0 +1,136 @@
+@model LeaderboardViewModel
+@{
+    ViewData["Title"] = "Leaderboard";
+    var tabs = new[]
+    {
+        (LeaderboardViewModel.TabAll, "All time"),
+        (LeaderboardViewModel.TabWeek, "This week"),
+        (LeaderboardViewModel.TabFastest, "Fastest wins"),
+        (LeaderboardViewModel.TabVatican, "Vatican challenge")
+    };
+    string winsHeader = Model.Tab == LeaderboardViewModel.TabVatican ? "Underdog wins" : "Wins";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Leaderboard</h1>
+        <div class="cr-sub cr-upper">
+            @(Model.Tab switch
+            {
+                LeaderboardViewModel.TabWeek => "Campaigns started in the last 7 days",
+                LeaderboardViewModel.TabFastest => "Fewest rounds to conquer the world",
+                LeaderboardViewModel.TabVatican => "Victories that started from a 1-soldier country",
+                _ => $"Every commander · {Model.TotalGames} campaign{(Model.TotalGames == 1 ? "" : "s")} on record"
+            })
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="cr-panel h-100">
+            <nav class="cr-tabs" aria-label="Leaderboard views">
+                @foreach (var (key, label) in tabs)
+                {
+                    <a class="@(Model.Tab == key ? "active" : "")" asp-action="Leaderboard" asp-route-tab="@key">@label</a>
+                }
+            </nav>
+
+            @if (Model.Rows.Count == 0)
+            {
+                <div class="text-center py-5">
+                    <p class="cr-readout mb-2">No commanders on this board yet <span class="cr-cursor"></span></p>
+                    <p class="cr-sub mb-3">
+                        @(Model.Tab is LeaderboardViewModel.TabFastest or LeaderboardViewModel.TabVatican
+                            ? "Win a campaign to claim the first spot."
+                            : "Play a campaign to appear here.")
+                    </p>
+                    @if (Model.IsLoggedIn)
+                    {
+                        <a class="cr-btn green" asp-controller="Games" asp-action="New">Start a campaign</a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="cr-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Commander</th>
+                                <th class="text-center">Games</th>
+                                <th class="text-center">Fastest win</th>
+                                <th class="text-center">@winsHeader</th>
+                                <th class="text-center">Win rate</th>
+                                <th>Favourite</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in Model.Rows)
+                            {
+                                <tr class="@(r.IsMe ? "mine" : "")">
+                                    <td class="@(r.Rank <= 3 ? "cr-amber fw-bold" : "")">@r.Rank</td>
+                                    <td class="@(r.IsMe ? "cr-green" : "")">@r.Commander @(r.IsMe ? "[you]" : "")</td>
+                                    <td class="text-center">@r.Games</td>
+                                    <td class="text-center">@(r.FastestWin is int f ? $"{f} rounds" : "—")</td>
+                                    <td class="text-center">@r.Wins</td>
+                                    <td class="text-center">@(r.WinRate is double w ? w.ToString("P0") : "—")</td>
+                                    <td class="cr-amber">@(r.Favourite ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <p class="cr-sub mt-2 mb-0">Win rate counts finished campaigns only.</p>
+            }
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="cr-panel cr-glow">
+            <div class="cr-label"><span>Your rank</span></div>
+            @if (Model.MyRank is { } me)
+            {
+                <div class="cr-digits cr-green" style="font-size:4.5rem">#@me.Rank</div>
+                <div class="cr-upper small">@me.Wins win@(me.Wins == 1 ? "" : "s") · @me.Games game@(me.Games == 1 ? "" : "s")</div>
+                @if (me.Gap is not null)
+                {
+                    <div class="cr-sub cr-upper mt-1">@me.Gap</div>
+                }
+            }
+            else if (Model.IsLoggedIn)
+            {
+                <p class="cr-sub mb-2">You're not on this board yet.</p>
+                <a class="cr-btn sm green" asp-controller="Games" asp-action="New">Start a campaign</a>
+            }
+            else
+            {
+                <p class="cr-sub mb-2">Log in to see where you stand.</p>
+                <a class="cr-btn sm" asp-controller="Account" asp-action="Login" asp-route-returnUrl="/leaderboard">Log in</a>
+            }
+        </div>
+
+        <div class="cr-panel">
+            <div class="cr-label"><span>Win rate by starting country</span></div>
+            <partial name="_RateBars" model="Model.WinRateByStart" />
+        </div>
+
+        <div class="cr-panel">
+            <div class="cr-label"><span>Hall of honour</span></div>
+            @if (Model.HallOfHonour.Count == 0)
+            {
+                <p class="cr-sub mb-0">Legends are made in battle. None yet.</p>
+            }
+            else
+            {
+                foreach (var h in Model.HallOfHonour)
+                {
+                    <div class="mb-2 small cr-upper">
+                        <span class="cr-amber">@h.Title</span> · @h.Value · <span class="cr-green">@h.Commander</span>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>

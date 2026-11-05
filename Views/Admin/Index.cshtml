@@ -1,0 +1,95 @@
+@model AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Admin · accounts";
+    string Date(DateTime? d) => d is null ? "—" : d.Value.ToLocalTime().ToString("d MMM yyyy");
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Admin · Accounts</h1>
+        <div class="cr-sub cr-upper">Every commander on the platform · admins only</div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    @foreach (var (label, value, cls) in new[]
+    {
+        ("Accounts", Model.Counts.Total, ""), ("Active", Model.Counts.Active, "cr-green"),
+        ("Suspended", Model.Counts.Suspended, "cr-red"), ("Admins", Model.Counts.Admins, "cr-amber")
+    })
+    {
+        <div class="col-6 col-md-3">
+            <div class="cr-panel text-center mb-0">
+                <div class="cr-stat @cls">@value</div>
+                <div class="cr-sub cr-upper">@label</div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="cr-panel">
+    <form method="get" asp-action="Index" class="row g-2 align-items-end mb-3" role="search">
+        <div class="col-md-5">
+            <label class="form-label" for="a-search">Search</label>
+            <input id="a-search" name="search" value="@Model.Search" class="form-control" placeholder="Username, commander name or email" maxlength="@InputGuard.MaxSearchLength" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="a-status">Status</label>
+            <select id="a-status" name="status" class="form-select">
+                <option value="">All</option>
+                <option value="Active" selected="@(Model.Status == AccountStatus.Active)">Active</option>
+                <option value="Suspended" selected="@(Model.Status == AccountStatus.Suspended)">Suspended</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="a-role">Role</label>
+            <select id="a-role" name="role" class="form-select">
+                <option value="">All</option>
+                <option value="Player" selected="@(Model.Role == UserAccount.PlayerRole)">Player</option>
+                <option value="Admin" selected="@(Model.Role == UserAccount.AdminRole)">Admin</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="cr-btn green flex-grow-1">Filter</button>
+            <a asp-action="Index" class="cr-btn">Clear</a>
+        </div>
+    </form>
+
+    @if (!Model.Accounts.Any())
+    {
+        <p class="cr-muted text-center my-4">No accounts match.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="cr-table">
+                <thead>
+                    <tr>
+                        <th>Commander</th><th>Email</th><th>Role</th><th>Status</th>
+                        <th class="text-end">Games</th><th>Joined</th><th>Last login</th><th>POPIA</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in Model.Accounts)
+                    {
+                        <tr class="@(a.IsSuspended ? "cr-row-out" : "")">
+                            <td>
+                                <a asp-action="Account" asp-route-id="@a.Id" class="fw-semibold">@a.DisplayName</a>
+                                <div class="small cr-muted">@@@a.Username @(a.IsYou ? "· you" : "")</div>
+                            </td>
+                            <td class="small">@a.Email</td>
+                            <td><span class="cr-chip @(a.IsAdmin ? "amber" : "")">@a.Role</span></td>
+                            <td><span class="cr-chip @(a.IsSuspended ? "red" : "green")">@a.Status</span></td>
+                            <td class="text-end">@a.Games</td>
+                            <td class="small">@Date(a.CreatedAtUtc)</td>
+                            <td class="small">@Date(a.LastLoginAtUtc)</td>
+                            <td class="small">@(a.HasCurrentConsent ? "✔" : "Pending")</td>
+                            <td class="text-end"><a asp-action="Account" asp-route-id="@a.Id" class="cr-btn sm">Manage</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="small cr-muted mt-2 mb-0">Showing @Model.Accounts.Count account@(Model.Accounts.Count == 1 ? "" : "s"), newest first.</p>
+    }
+</div>

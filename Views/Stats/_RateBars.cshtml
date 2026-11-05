@@ -1,0 +1,18 @@
+@model IReadOnlyList<RateBar>
+@if (Model.Count == 0)
+{
+    <p class="cr-sub mb-0">Appears once campaigns are finished.</p>
+}
+else
+{
+    <div class="cr-bars">
+        @foreach (var bar in Model)
+        {
+            <div class="row-bar" style="--pc:var(--cr-amber);grid-template-columns:7.5rem 1fr 2.6rem" title="@bar.SampleSize finished game(s)">
+                <span class="nm" style="color:var(--cr-text)">@bar.Label</span>
+                <div class="track"><div class="fill" style="width:@((int)Math.Round(bar.Rate * 100))%"></div></div>
+                <span class="val">@bar.Rate.ToString("P0")</span>
+            </div>
+        }
+    </div>
+}

@@ -23,11 +23,15 @@ public sealed class MongoDbContext
         _database = client.GetDatabase(settings.DatabaseName);
         Games = _database.GetCollection<GameSession>(settings.GamesCollectionName);
         Users = _database.GetCollection<UserAccount>(settings.UsersCollectionName);
+        DataProtectionKeys = _database.GetCollection<BsonDocument>("dataProtectionKeys");
     }
 
     public IMongoCollection<GameSession> Games { get; }
 
     public IMongoCollection<UserAccount> Users { get; }
+
+    /// <summary>Cookie-encryption keys, shared by every app instance and kept across restarts.</summary>
+    public IMongoCollection<BsonDocument> DataProtectionKeys { get; }
 
     /// <summary>Round-trips to Atlas; throws if the cluster is unreachable or credentials are wrong.</summary>
     public Task PingAsync(CancellationToken cancellationToken = default) =>
