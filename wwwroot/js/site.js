@@ -177,8 +177,8 @@
 
     paintInstall();
 
-    // ── Phones: landscape for the game ────────────────────────────────────
-    // The prompt shows on the game page while a phone is upright, until dismissed for this visit.
+    // ── Phones: suggest landscape on the game page ─────────────────────────
+    // Only a suggestion: the page never goes full screen or turns the screen by itself.
     const rotate = document.querySelector('[data-rotate-prompt]');
     if (rotate) {
         let dismissed = false;
@@ -188,10 +188,6 @@
             rotate.hidden = true;
             try { sessionStorage.setItem('geoconquest.rotateDismissed', '1'); } catch { }
         });
-        // In the installed app (Android) the game screen can turn itself sideways.
-        if (standalone && screen.orientation?.lock) screen.orientation.lock('landscape').catch(() => { });
-    } else if (standalone && screen.orientation?.unlock) {
-        try { screen.orientation.unlock(); } catch { }
     }
 
     applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');

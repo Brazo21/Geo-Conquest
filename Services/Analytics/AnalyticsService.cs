@@ -242,6 +242,21 @@ public sealed class AnalyticsService : IAnalyticsService
 
         var rounds = new List<ReplayRound>();
         var moments = new List<KeyMoment>();
+        var steps = new List<ReplayStep>();
+
+        // A frame for every move that changes the board, so even a game still in round 1 plays back.
+        (int[] Owners, int[] Soldiers) Snapshot(IReadOnlyList<BoardEntry> board)
+        {
+            var o = new int[countries.Count];
+            var so = new int[countries.Count];
+            foreach (var b in board)
+            {
+                if (!codeIndex.TryGetValue(b.Code, out int i)) continue;
+                o[i] = b.OwnerIndex;
+                so[i] = b.Soldiers;
+            }
+            return (o, so);
+        }
         IReadOnlyList<BoardEntry> previous = Array.Empty<BoardEntry>();
         bool halfAnnounced = false;
 
@@ -252,26 +267,36 @@ public sealed class AnalyticsService : IAnalyticsService
                 var board = e.ReadBoard();
                 string countryName = e.ToCountryCode is not null && codeIndex.TryGetValue(e.ToCountryCode, out int ci) ? countries[ci].Name : "?";
 
+                bool isStep = board.Count > 0 && (steps.Count == 0 || e.Type is GameEventType.Reinforced or GameEventType.Transferred
+                    or GameEventType.CountryConquered or GameEventType.AttackFailed or GameEventType.AttackRetreated
+                    or GameEventType.AllianceFormed or GameEventType.AllianceBroken);
+                if (isStep)
+                {
+                    var (o, so) = Snapshot(board);
+                    steps.Add(new ReplayStep(e.Round, steps.Count == 0 ? "The campaign begins" : e.Message, o, so));
+                }
+                int stepIndex = Math.Max(0, steps.Count - 1);
+
                 if (e.Type == GameEventType.CountryConquered)
                 {
                     if (e.ActorPlayerId == humanId)
-                        moments.Add(new KeyMoment(e.Round, $"You take {countryName}", true));
+                        moments.Add(new KeyMoment(e.Round, $"You take {countryName}", true, stepIndex));
                     else if (previous.Any(b => b.Code == e.ToCountryCode && b.OwnerIndex == humanIndex))
-                        moments.Add(new KeyMoment(e.Round, $"You lose {countryName} to {game.Players.First(p => p.PlayerId == e.ActorPlayerId).DisplayName}", false));
+                        moments.Add(new KeyMoment(e.Round, $"You lose {countryName} to {game.Players.First(p => p.PlayerId == e.ActorPlayerId).DisplayName}", false, stepIndex));
                 }
                 else if (e.Type == GameEventType.PlayerEliminated && e.ActorPlayerId != humanId)
                 {
-                    moments.Add(new KeyMoment(e.Round, e.Message, true));
+                    moments.Add(new KeyMoment(e.Round, e.Message, true, stepIndex));
                 }
                 else if (e.Type is GameEventType.GameWon or GameEventType.GameLost)
                 {
-                    moments.Add(new KeyMoment(e.Round, e.Message, e.Type == GameEventType.GameWon && e.ActorPlayerId == humanId));
+                    moments.Add(new KeyMoment(e.Round, e.Message, e.Type == GameEventType.GameWon && e.ActorPlayerId == humanId, stepIndex));
                 }
 
                 if (!halfAnnounced && board.Count(b => b.OwnerIndex == humanIndex) >= GameSession.BoardSize / 2)
                 {
                     halfAnnounced = true;
-                    moments.Add(new KeyMoment(e.Round, "You hold half the world", true));
+                    moments.Add(new KeyMoment(e.Round, "You hold half the world", true, stepIndex));
                 }
 
                 if (board.Count > 0)
@@ -292,7 +317,18 @@ public sealed class AnalyticsService : IAnalyticsService
             rounds.Add(new ReplayRound(roundGroup.Key, owners, soldiers));
         }
 
-        return new ReplayData(game.Id, game.Id[..4].ToUpperInvariant(), players, countries, rounds, moments.Take(40).ToList());
+        // Very long games: keep the page light by sampling evenly (always keeping the first and last move).
+        const int maxSteps = 600;
+        if (steps.Count > maxSteps)
+        {
+            double stride = (steps.Count - 1) / (double)(maxSteps - 1);
+            var sampled = Enumerable.Range(0, maxSteps).Select(i => (int)Math.Round(i * stride)).Distinct().ToList();
+            var map = sampled.Select((orig, idx) => (orig, idx)).ToList();
+            moments = moments.Select(m => m with { Step = map.Last(x => x.orig <= m.Step).idx }).ToList();
+            steps = sampled.Select(i => steps[i]).ToList();
+        }
+
+        return new ReplayData(game.Id, game.Id[..4].ToUpperInvariant(), players, countries, rounds, moments.Take(40).ToList(), steps);
     }
 
     private static IReadOnlyList<CouncilEntry> WarCouncil(IEnumerable<GameSession> games) =>

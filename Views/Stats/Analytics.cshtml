@@ -152,6 +152,7 @@ else
                                     <button type="button" class="cr-btn sm" data-rp-speed="4">4×</button>
                                 </span>
                             </div>
+                            <p class="small mb-2" id="rp-caption" aria-live="polite" style="min-height:2.6em;color:var(--cr-text)"></p>
                             <table class="cr-table" style="font-size:.78rem"><tbody id="rp-ledger"></tbody></table>
                             <div class="mt-3">
                                 <a class="cr-btn sm" asp-controller="Games" asp-action="Play" asp-route-id="@Model.Replay.GameId">Open this game →</a>
@@ -171,7 +172,7 @@ else
                                     @foreach (var m in Model.Replay.KeyMoments)
                                     {
                                         <button type="button" class="entry d-block w-100 text-start bg-transparent border-0 border-start @(m.Good ? "cr-green" : "cr-red")"
-                                                style="border-left:2px solid currentColor !important" data-jump="@m.Round">
+                                                style="border-left:2px solid currentColor !important" data-jump="@m.Round" data-step="@m.Step">
                                             R@(m.Round) · @m.Text
                                         </button>
                                     }

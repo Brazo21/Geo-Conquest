@@ -894,3 +894,5 @@ body.cr-shake { animation: cr-shake .12s linear 6; }
   .cr-rotate { display: none !important; }
   .cr-sound-hint { bottom: .5rem; }
 }
+
+.rp-changed td { background: rgba(242, 178, 76, .14); transition: background .4s; }

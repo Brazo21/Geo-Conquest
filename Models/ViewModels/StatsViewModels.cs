@@ -75,7 +75,11 @@ public sealed record ReplayData(
     IReadOnlyList<ReplayPlayer> Players,
     IReadOnlyList<ReplayCountry> Countries,
     IReadOnlyList<ReplayRound> Rounds,
-    IReadOnlyList<KeyMoment> KeyMoments);
+    IReadOnlyList<KeyMoment> KeyMoments,
+    IReadOnlyList<ReplayStep> Steps);
+
+/// <summary>The board after one move (reinforcement, transfer, conquest, failed or called-off attack).</summary>
+public sealed record ReplayStep(int Round, string Text, IReadOnlyList<int> Owners, IReadOnlyList<int> Soldiers);
 
 public sealed record ReplayPlayer(string Name, string Color, bool IsHuman, string Tag);
 
@@ -84,6 +88,6 @@ public sealed record ReplayCountry(string Code, string Name);
 /// <summary>Board at the end of a round: owner index and soldiers per country (same order as Countries).</summary>
 public sealed record ReplayRound(int Round, IReadOnlyList<int> Owners, IReadOnlyList<int> Soldiers);
 
-public sealed record KeyMoment(int Round, string Text, bool Good);
+public sealed record KeyMoment(int Round, string Text, bool Good, int Step = 0);
 
 public sealed record CouncilEntry(string Tag, string Color, string Message, string Reason);
