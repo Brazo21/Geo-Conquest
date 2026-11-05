@@ -228,6 +228,27 @@ app.UseAuthorization();
 // Health check for the host: answers fast and touches nothing personal.
 app.MapGet("/healthz", () => Results.Text("ok")).AllowAnonymous().DisableRateLimiting();
 
+// Android app (APK) built from this site with PWABuilder / Bubblewrap: this file proves the app and the site
+// belong together, so the app opens full screen without a browser bar. Values come from configuration
+// (Android:PackageName, Android:Sha256Fingerprints); until they are set the address returns 404.
+app.MapGet("/.well-known/assetlinks.json", (IConfiguration config) =>
+{
+    string? package = config["Android:PackageName"];
+    string[] fingerprints = config.GetSection("Android:Sha256Fingerprints").Get<string[]>() ??
+                            (config["Android:Sha256Fingerprints"]?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? Array.Empty<string>());
+    if (string.IsNullOrWhiteSpace(package) || fingerprints.Length == 0)
+        return Results.NotFound();
+
+    return Results.Json(new[]
+    {
+        new
+        {
+            relation = new[] { "delegate_permission/common.handle_all_urls" },
+            target = new { @namespace = "android_app", package_name = package, sha256_cert_fingerprints = fingerprints }
+        }
+    });
+}).AllowAnonymous().DisableRateLimiting();
+
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");

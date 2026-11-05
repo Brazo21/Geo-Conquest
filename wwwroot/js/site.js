@@ -158,6 +158,7 @@
         ev.preventDefault();
         installPrompt = ev;
         paintInstall();
+
     });
 
     window.addEventListener('appinstalled', () => {
@@ -175,6 +176,23 @@
     });
 
     paintInstall();
+
+    // ── Phones: landscape for the game ────────────────────────────────────
+    // The prompt shows on the game page while a phone is upright, until dismissed for this visit.
+    const rotate = document.querySelector('[data-rotate-prompt]');
+    if (rotate) {
+        let dismissed = false;
+        try { dismissed = sessionStorage.getItem('geoconquest.rotateDismissed') === '1'; } catch { }
+        rotate.hidden = dismissed;
+        rotate.querySelector('[data-rotate-dismiss]')?.addEventListener('click', () => {
+            rotate.hidden = true;
+            try { sessionStorage.setItem('geoconquest.rotateDismissed', '1'); } catch { }
+        });
+        // In the installed app (Android) the game screen can turn itself sideways.
+        if (standalone && screen.orientation?.lock) screen.orientation.lock('landscape').catch(() => { });
+    } else if (standalone && screen.orientation?.unlock) {
+        try { screen.orientation.unlock(); } catch { }
+    }
 
     applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
 })();

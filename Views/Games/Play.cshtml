@@ -341,29 +341,9 @@ else
                     </ul>
                 }
 
-                @if (Model.CanBreakAlliance)
+                @if (Model.CanAct && Model.Phase == TurnPhase.Action)
                 {
-                    <form asp-action="BreakAlliance" asp-route-id="@Model.GameId" method="post" class="mt-2" data-confirm="Break the alliance? Your ally will never trust you again and will target you first.">
-                        <button type="submit" class="cr-btn sm w-100">Break alliance (betrayal)</button>
-                    </form>
-                }
-                else if (Model.CanProposeAlliance)
-                {
-                    <form asp-action="ProposeAlliance" asp-route-id="@Model.GameId" method="post" class="d-flex gap-2 mt-2">
-                        <label class="visually-hidden" for="ally-pick">Commander to ally with</label>
-                        <select id="ally-pick" name="PartnerId" class="form-select form-select-sm" required>
-                            @foreach (var c in Model.AllianceCandidates)
-                            {
-                                <option value="@c.PlayerId">@c.Name@(c.HoldsGrudge ? " (betrayed)" : "")</option>
-                            }
-                        </select>
-                        <button type="submit" class="cr-btn sm green">Propose</button>
-                    </form>
-                    <p class="small cr-muted mt-2 mb-0">One proposal per turn. Each general decides in character and says why.</p>
-                }
-                else if (Model.CanAct && Model.AllianceProposedThisTurn && Model.HumanAlliance is null)
-                {
-                    <p class="small cr-muted mb-0">You've made your proposal this turn.</p>
+                    <p class="small cr-muted mb-0">Use <strong class="cr-amber">Alliance</strong> in the controls to propose or break a pact.</p>
                 }
             </div>
 
@@ -393,7 +373,7 @@ else
         </div>
 
         @* ───── Centre: map, status, controls ───── *@
-        <div class="col-xl-6 col-lg-8 order-1 order-lg-2">
+        <div class="col-xl-6 col-lg-8 order-1 order-lg-2 cr-center">
             <div class="cr-panel">
                 <div class="cr-label"><span>The world · all 10 countries visible</span><span class="hint">@(Model.CanAct ? "click a pin to pick a target" : "pins show soldiers")</span></div>
                 <div class="cr-screen">
@@ -475,6 +455,8 @@ else
                                     </form>
                                     <button type="button" class="cr-btn" data-bs-toggle="collapse" data-bs-target="#transfer-box"
                                             aria-expanded="false" aria-controls="transfer-box" disabled="@(Model.MyCountries.Count() >= 2 ? null : "disabled")">Transfer</button>
+                                    <button type="button" class="cr-btn cyan" data-bs-toggle="collapse" data-bs-target="#ally-box"
+                                            aria-expanded="false" aria-controls="ally-box">@(Model.HumanAlliance is null ? "Alliance" : "Alliance ✓")</button>
                                 </div>
                                 @if (Model.AttackUsedThisTurn)
                                 {
@@ -539,6 +521,47 @@ else
                             </form>
                             <p class="small cr-upper mt-2 mb-0" style="color:#ece4cc;font-size:.66rem">Every country keeps at least 1 soldier.</p>
                         </div>
+                        <div class="collapse mt-3 @(Model.AllianceProposedThisTurn ? "show" : "")" id="ally-box">
+                            <div class="cr-label mb-2"><span>Alliance</span><span class="hint">rest of this round + @GameSession.AllianceLengthRounds · allies can't attack each other</span></div>
+                            @if (Model.HumanAlliance is { } pact)
+                            {
+                                <p class="small mb-2" style="color:#ece4cc">You are allied with <strong>@((pact.FirstName == Model.CommanderName ? pact.SecondName : pact.FirstName).Split(" · ")[0])</strong> until the end of round @pact.UntilRound.</p>
+                            }
+                    @if (Model.CanBreakAlliance)
+                    {
+                        <form asp-action="BreakAlliance" asp-route-id="@Model.GameId" method="post" class="mt-2" data-confirm="Break the alliance? Your ally will never trust you again and will target you first.">
+                            <button type="submit" class="cr-btn sm w-100">Break alliance (betrayal)</button>
+                        </form>
+                    }
+                    else if (Model.CanProposeAlliance)
+                    {
+                        <form asp-action="ProposeAlliance" asp-route-id="@Model.GameId" method="post" class="d-flex gap-2 mt-2">
+                            <label class="visually-hidden" for="ally-pick">Commander to ally with</label>
+                            <select id="ally-pick" name="PartnerId" class="form-select form-select-sm" required>
+                                @foreach (var c in Model.AllianceCandidates)
+                                {
+                                    <option value="@c.PlayerId">@c.Name@(c.HoldsGrudge ? " (betrayed)" : "")</option>
+                                }
+                            </select>
+                            <button type="submit" class="cr-btn sm green">Propose</button>
+                        </form>
+                        <p class="small cr-muted mt-2 mb-0">One proposal per turn. Each general decides in character and says why.</p>
+                    }
+                    @if (Model.AllianceProposedThisTurn && Model.LastAllianceAnswer is { } answer)
+                    {
+                        <div class="cr-ally-answer mt-2 @(answer.Type == GameEventType.AllianceFormed ? "yes" : "no")">
+                            <div class="msg">@answer.Message</div>
+                            @if (answer.Reasoning is not null)
+                            {
+                                <div class="why">Why: @answer.Reasoning</div>
+                            }
+                            @if (answer.Type == GameEventType.AllianceRejected)
+                            {
+                                <div class="small cr-muted mt-1">One proposal per turn. Try another general next turn.</div>
+                            }
+                        </div>
+                    }
+                        </div>
                     }
                     else if (Model.IsOwner && inProgress)
                     {
@@ -565,7 +588,7 @@ else
 
         @* ───── Right: NPC cards, decisions, standings, ledger ───── *@
         <div class="col-xl-3 col-lg-12 order-3">
-            <div class="cr-cards">
+            <div class="cr-cards cr-roster">
                 @foreach (var p in Model.Players)
                 {
                     <div class="cr-card @(p.IsCurrent ? "current" : "") @(p.IsEliminated ? "out" : "")" style="--pc:@p.Color" data-player="@p.Id">
@@ -645,6 +668,13 @@ else
         </div>
     </div>
 }
+
+@* Phones held upright get a gentle prompt to turn sideways, where the whole command room fits (site.js). *@
+<div class="cr-rotate" role="status" data-rotate-prompt hidden>
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#f2b24c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>
+    <div class="txt"><strong>Turn your phone sideways</strong>The whole command room fits on screen in landscape.</div>
+    <button type="button" data-rotate-dismiss>OK</button>
+</div>
 
 @section Scripts {
     <script nonce="@Context.CspNonce()">window.geoConquest = @Json.Serialize(clientState);</script>

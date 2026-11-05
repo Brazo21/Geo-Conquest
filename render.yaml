@@ -36,3 +36,7 @@ services:
         sync: false
       - key: Privacy__ContactEmail
         sync: false
+      - key: Android__PackageName
+        sync: false
+      - key: Android__Sha256Fingerprints
+        sync: false

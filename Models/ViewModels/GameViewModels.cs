@@ -167,6 +167,10 @@ public sealed class PlayGameViewModel
     public bool CanProposeAlliance => CanAct && Phase != TurnPhase.Attacking && HumanAlliance is null &&
                                       !AllianceProposedThisTurn && AllianceCandidates.Count > 0;
     public bool CanBreakAlliance => CanAct && Phase != TurnPhase.Attacking && HumanAlliance is not null;
+
+    /// <summary>The general's answer to this turn's proposal (shown right under the Alliance controls).</summary>
+    public EventRow? LastAllianceAnswer =>
+        Events.FirstOrDefault(e => e.Type is GameEventType.AllianceFormed or GameEventType.AllianceRejected && e.Round == Round);
     public IEnumerable<CountryRow> AttackSources => MyCountries.Where(c => c.Soldiers >= Country.MinimumAttackingStrength);
 
     public static PlayGameViewModel From(GameSession session, string? userId, IBattleOddsCalculator odds, int recentEvents = 60)
