@@ -169,8 +169,17 @@ try
 {
     await mongo.PingAsync();
     await mongo.EnsureIndexesAsync();
-    using (var scope = app.Services.CreateScope())
+
+    // A bad admin setting (e.g. weak password) is logged clearly but doesn't stop the site from starting.
+    try
+    {
+        using var scope = app.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<AdminSeeder>().SeedAsync();
+    }
+    catch (DomainException ex)
+    {
+        app.Logger.LogError("Admin account not created: {Reason} Fix Admin__Password / Admin__Username / Admin__Email and redeploy.", ex.Message);
+    }
 
     var email = app.Services.GetRequiredService<IOptions<EmailSettings>>().Value;
     if (email.IsConfigured && string.IsNullOrWhiteSpace(email.PublicBaseUrl) && !app.Environment.IsDevelopment())

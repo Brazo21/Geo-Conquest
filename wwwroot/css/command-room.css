@@ -825,3 +825,18 @@ body.cr-shake { animation: cr-shake .12s linear 6; }
 .cr-pw-eye:hover { color: var(--cr-amber-hi); border-color: var(--cr-line-dim); }
 .cr-pw-eye:focus-visible { outline: 2px solid var(--cr-amber-hi); outline-offset: 1px; }
 .cr-pw-eye.on { color: var(--cr-green); }
+
+/* ── Get the app page ───────────────────────────────────────────────────── */
+.cr-app-icon { border-radius: 18px; box-shadow: 0 0 18px rgba(233, 166, 60, .25); flex-shrink: 0; }
+.cr-steps { padding-left: 1.3rem; line-height: 1.9; margin-bottom: .5rem; }
+.cr-key { display: inline-block; min-width: 1.6em; text-align: center; border: 1px solid var(--cr-line); padding: 0 .3em; font-size: .9em; }
+.cr-qr { background: #fff; padding: 12px; width: max-content; border: 1px solid var(--cr-line); }
+.cr-qr img { display: block; width: 220px; height: 220px; image-rendering: pixelated; }
+[hidden] { display: none !important; }
+
+/* Installed app: a little more room for thumbs, no hover-only affordances needed. */
+.is-app .cr-footer { padding-bottom: calc(.6rem + env(safe-area-inset-bottom)); }
+@media (max-width: 575px) {
+  .cr-btn { min-height: 2.75rem; }
+  .cr-nav a, .cr-nav button { padding: .5rem .6rem; }
+}

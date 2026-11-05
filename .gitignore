@@ -363,3 +363,7 @@ MigrationBackup/
 FodyWeavers.xsd
 # Temporary build-check archives
 .claude-build/
+
+# Submission zip and private notes (contain no code changes; keep off GitHub)
+GeoConquest-Source.zip
+SUBMISSION.txt

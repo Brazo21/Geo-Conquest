@@ -12,11 +12,14 @@ Anyone with a game's link can watch it in real time; only the logged-in owner ca
 
 | | |
 |---|---|
-| **Live site** | `https://<your-service>.onrender.com` |
-| **Player account** | username `<demo player>` · password `<password>` |
-| **Admin account** | username `<demo admin>` · password `<password>` |
-| **Database** | MongoDB Atlas. Access granted to ammarcanani@gmail.com, mc.tanner@uct.ac.za and ridewaan.hanslo@uct.ac.za |
+| **Live site** | https://geoconquest-066c.onrender.com/ |
+| **Player account** | username `Asanda` · password given in the Amathuba submission note |
+| **Admin account** | username given in the Amathuba submission note |
+| **Database** | MongoDB Atlas. Project access granted to ammarcanani@gmail.com, mc.tanner@uct.ac.za and ridewaan.hanslo@uct.ac.za |
+| **Source code** | the attached zip (also on GitHub: github.com/Brazo21/Geo-Conquest, branch `master`) |
 
+> Passwords are kept out of the code on purpose, so they are never published on GitHub.
+>
 > The site runs on Render's free plan, which sleeps after a period without visitors.
 > **The first visit can take about a minute to wake up**; after that it is fast.
 
@@ -24,10 +27,11 @@ Anyone with a game's link can watch it in real time; only the logged-in owner ca
 1. **Watch without an account:** open *Live Games* and click any game. You see the board, dice and NPC reasoning live but get no buttons.
 2. **Play:** log in as the player (or sign up), pick a country on *New Game*, reinforce, attack, roll, transfer, end turn. Use 1×/2×/4× to fast-forward the NPC turns.
 3. **Share link:** press *Copy share link* in a game and open it in a private window to watch it update in real time.
-4. **Admin:** log in as the admin → *★ Admin panel*: search accounts, suspend (the user is signed out at once), reactivate, change roles, send a reset link.
-5. **Forgot password:** *Log in → Forgot password?* emails a single-use link valid for 30 minutes.
-6. **POPIA:** consent at sign-up, the full notice under *Privacy*, and *Your data* to view or delete your information.
-7. **Settings:** sound, music, vibration (Android), brightness, text size, dice animation and your General's look.
+4. **Play on a phone:** open *📲 Get the app* (footer or account menu). Install it on Android or a computer with one tap, add it from Safari's *Share → Add to Home Screen* on iPhone, or scan the QR code.
+5. **Admin:** log in as the admin → *★ Admin panel*: search accounts, suspend (the user is signed out at once), reactivate, change roles, send a reset link.
+6. **Forgot password:** *Log in → Forgot password?* emails a single-use link valid for 30 minutes.
+7. **POPIA:** consent at sign-up, the full notice under *Privacy*, and *Your data* to view or delete your information.
+8. **Settings:** sound, music, vibration (Android), brightness, text size, dice animation and your General's look.
 
 ---
 
@@ -37,8 +41,9 @@ Anyone with a game's link can watch it in real time; only the logged-in owner ca
 - **NPCs** (`Services/Npc`): three personalities (Aggressor, Defender, Opportunist) that score every possible attack using exact win odds (`BattleOddsCalculator`) and record *why* they chose each move.
 - **AI commentary** (`Services/Commentary`): Gemini through the OpenAI-compatible API with a fallback model, and built-in lines if the AI is busy, so a game never stalls.
 - **Live replay and spectating:** every event is stored in the game document; the page replays new events step by step, and spectators poll every 3 seconds.
-- **Accounts and security:** PBKDF2-hashed passwords, cookie authentication, Visitor / Player / Admin roles, anti-forgery tokens on every form, login rate limiting, a Content-Security-Policy with per-request nonces, security headers, HSTS, sessions that end immediately on suspension or password reset, and optimistic concurrency so two tabs can't corrupt a game.
+- **Accounts and security:** an Account security page to change password or email (current password required; other devices signed out), PBKDF2-hashed passwords, cookie authentication, Visitor / Player / Admin roles, anti-forgery tokens on every form, login rate limiting, a Content-Security-Policy with per-request nonces, security headers, HSTS, sessions that end immediately on suspension or password reset, and optimistic concurrency so two tabs can't corrupt a game.
 - **POPIA:** server-checked consent with version and date, a full privacy notice, and a self-service *Your data* page (access and erasure).
+- **Installable phone app (PWA):** a web app manifest, home-screen icons and a service worker make GeoConquest installable on Android, iPhone and computers without an app store. It opens full screen, updates itself, and shows an offline screen without a signal. Pages are never cached, because they can hold personal data and every move must be checked live by the server.
 - **Extras:** leaderboard, personal analytics with territory-over-time replay, synthesised sound effects and music, vibration, 3-D animated dice, an animated General avatar, light/dark themes and a settings page.
 
 ### Architecture
@@ -92,7 +97,7 @@ The repository includes a `Dockerfile` and a `render.yaml` blueprint.
    | `Admin__Username`, `Admin__Email`, `Admin__Password` | first administrator |
    | `Email__ApiKey` | Brevo API key (Render's free plan blocks SMTP, so email goes through Brevo's HTTPS API) |
    | `Email__FromAddress` | the sender address you verified in Brevo |
-   | `Email__PublicBaseUrl` | the site address, e.g. `https://geoconquest.onrender.com` |
+   | `Email__PublicBaseUrl` | the site address, e.g. `https://geoconquest-066c.onrender.com` |
    | `Privacy__InformationOfficer`, `Privacy__ContactEmail` | shown in the POPIA notice (optional) |
 
 3. In Atlas → *Network Access*, add Render's outbound IP ranges (Render service → **Connect** → **Outbound**), or `0.0.0.0/0`. The database is still protected by its username and password.
@@ -117,5 +122,6 @@ Models/ViewModels/ view models and validated input models
 Security/          CSP and security headers, session validation, POPIA consent filter, input guards
 Views/             Razor views (Command Room theme)
 wwwroot/js/        map, live feed, odds, dice, sound, General, settings
+wwwroot/sw.js, manifest.webmanifest, icons/   installable phone app (PWA)
 Dockerfile, render.yaml   deployment
 ```

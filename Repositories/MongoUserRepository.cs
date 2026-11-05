@@ -106,6 +106,14 @@ public sealed class MongoUserRepository : IUserRepository
     public async Task UpdateAsync(UserAccount account, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(account);
-        await _users.ReplaceOneAsync(u => u.Id == account.Id, account, cancellationToken: cancellationToken);
+        try
+        {
+            await _users.ReplaceOneAsync(u => u.Id == account.Id, account, cancellationToken: cancellationToken);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // e.g. two people switching to the same email at the same moment: the unique index decides.
+            throw new DuplicateAccountException(ex);
+        }
     }
 }

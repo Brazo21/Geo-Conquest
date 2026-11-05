@@ -134,3 +134,51 @@ public sealed class MustBeTrueAttribute : ValidationAttribute
 {
     public override bool IsValid(object? value) => value is true;
 }
+
+/// <summary>Account security page: change password and change email, each confirmed with the current password.</summary>
+public sealed class SecurityViewModel
+{
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public DateTime? PasswordChangedAtUtc { get; set; }
+
+    public ChangePasswordViewModel Password { get; set; } = new();
+    public ChangeEmailViewModel EmailChange { get; set; } = new();
+}
+
+public sealed class ChangePasswordViewModel
+{
+    [Required(ErrorMessage = "Enter your current password.")]
+    [DataType(DataType.Password)]
+    [StringLength(100)]
+    [Display(Name = "Current password")]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Enter a new password.")]
+    [DataType(DataType.Password)]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = "At least 8 characters.")]
+    [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d).+$", ErrorMessage = "Include at least one letter and one number.")]
+    [Display(Name = "New password")]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Type the new password again.")]
+    [DataType(DataType.Password)]
+    [Compare(nameof(NewPassword), ErrorMessage = "The new passwords don't match.")]
+    [Display(Name = "Confirm new password")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+}
+
+public sealed class ChangeEmailViewModel
+{
+    [Required(ErrorMessage = "Enter the new email address.")]
+    [EmailAddress]
+    [StringLength(254)]
+    [Display(Name = "New email")]
+    public string NewEmail { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Enter your current password.")]
+    [DataType(DataType.Password)]
+    [StringLength(100)]
+    [Display(Name = "Current password")]
+    public string CurrentPassword { get; set; } = string.Empty;
+}

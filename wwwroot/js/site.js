@@ -50,6 +50,14 @@
         if (ev.target.matches?.('[data-select-on-click]')) ev.target.select();
     });
 
+    // Form checks: once a field has shown an error, re-check it on every change (typing, pasting, autofill),
+    // so a corrected field never keeps blocking the form. Also re-checks a linked field such as "confirm password".
+    document.addEventListener('input', ev => {
+        const form = ev.target.form;
+        if (!form || !window.jQuery || !jQuery.fn.valid) return;
+        form.querySelectorAll('.input-validation-error').forEach(el => jQuery(el).valid());
+    });
+
     // Dropdowns that submit their form when changed.
     document.addEventListener('change', ev => {
         if (ev.target.matches?.('[data-autosubmit]')) ev.target.form?.submit();
@@ -107,6 +115,49 @@
             btn.setAttribute('aria-label', 'Show password');
         });
     });
+
+    // ── Installable app (PWA) ─────────────────────────────────────────────
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker?.register('/sw.js', { scope: '/' }).catch(err => console.warn('Service worker not registered', err));
+        });
+    }
+
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const ua = navigator.userAgent;
+    const isIos = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    let installPrompt = null;
+
+    function paintInstall() {
+        const state = standalone ? 'installed' : installPrompt ? 'ready' : isIos ? 'ios' : 'manual';
+        document.querySelectorAll('[data-install-state]').forEach(el => {
+            el.hidden = !el.dataset.installState.split(' ').includes(state);
+        });
+        document.documentElement.classList.toggle('is-app', standalone);
+    }
+
+    // Chrome / Edge / Samsung Internet offer installation through this event.
+    window.addEventListener('beforeinstallprompt', ev => {
+        ev.preventDefault();
+        installPrompt = ev;
+        paintInstall();
+    });
+
+    window.addEventListener('appinstalled', () => {
+        installPrompt = null;
+        document.querySelectorAll('[data-install-state]').forEach(el => { el.hidden = el.dataset.installState !== 'done'; });
+    });
+
+    document.addEventListener('click', async ev => {
+        const btn = ev.target.closest('[data-install]');
+        if (!btn || !installPrompt) return;
+        installPrompt.prompt();
+        const choice = await installPrompt.userChoice.catch(() => null);
+        installPrompt = null;
+        if (choice?.outcome !== 'accepted') paintInstall();
+    });
+
+    paintInstall();
 
     applyTheme(document.documentElement.getAttribute('data-theme') || 'dark');
 })();

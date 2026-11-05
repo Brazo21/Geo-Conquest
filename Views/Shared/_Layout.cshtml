@@ -13,14 +13,16 @@
         controller == "Stats" && action == "Leaderboard" ? "board" :
         controller == "Stats" && action == "Analytics" ? "analytics" :
         controller == "Home" && action == "Settings" ? "settings" :
+        controller == "Home" && action == "App" ? "app" :
         controller == "Admin" ? "admin" :
         controller == "Account" && action == "MyData" ? "me" :
+        controller == "Account" && action == "Security" ? "security" :
         controller == "Account" ? "account" : "";
 
     string Lit(string key) => active == key ? "active" : "";
     bool isAdmin = User.IsInRole(UserAccount.AdminRole);
     bool statsActive = active is "board" or "analytics";
-    bool meActive = active is "settings" or "admin" or "me";
+    bool meActive = active is "settings" or "admin" or "me" or "app" or "security";
 }
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
@@ -40,8 +42,19 @@
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] · GeoConquest Command Room</title>
+    @* Tab icons: PNG/ICO for every browser, SVG for those that support it. *@
+    <link rel="icon" href="~/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="~/icons/icon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="~/icons/icon-16.png" type="image/png" sizes="16x16" />
     <link rel="icon" href="~/favicon.svg" type="image/svg+xml" />
-    <link rel="alternate icon" href="~/favicon.ico" />
+    @* Installable app (PWA): Android/desktop read the manifest, iPhone reads the apple-* tags. *@
+    <link rel="manifest" href="~/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="~/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0e0c08" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="GeoConquest" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet" />
@@ -95,7 +108,9 @@
                                     <li><a class="dropdown-item @Lit("admin")" asp-controller="Admin" asp-action="Index">★ Admin panel</a></li>
                                 }
                                 <li><a class="dropdown-item @Lit("settings")" asp-controller="Home" asp-action="Settings">⚙ Settings</a></li>
+                                <li><a class="dropdown-item @Lit("security")" asp-controller="Account" asp-action="Security">🔒 Account security</a></li>
                                 <li><a class="dropdown-item @Lit("me")" asp-controller="Account" asp-action="MyData">Your data</a></li>
+                                <li><a class="dropdown-item @Lit("app")" asp-controller="Home" asp-action="App">📲 Get the app</a></li>
                                 <li><hr class="dropdown-divider" /></li>
                                 <li>
                                     <form asp-controller="Account" asp-action="Logout" method="post">
@@ -137,7 +152,10 @@
     <footer class="cr-footer">
         <div class="container-fluid px-3 px-lg-4 d-flex flex-wrap justify-content-between gap-2">
             <span>© 2026 GeoConquest</span>
-            <span><a asp-controller="Home" asp-action="Privacy">Privacy</a></span>
+            <span class="d-flex gap-3">
+                <a asp-controller="Home" asp-action="App" data-app-link>📲 Get the app</a>
+                <a asp-controller="Home" asp-action="Privacy">Privacy</a>
+            </span>
         </div>
     </footer>
 

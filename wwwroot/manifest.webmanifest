@@ -1,0 +1,25 @@
+{
+  "id": "/?app=geoconquest",
+  "name": "GeoConquest · Command Room",
+  "short_name": "GeoConquest",
+  "description": "Turn-based world conquest against AI generals, with live AI battle commentary.",
+  "lang": "en-ZA",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#0e0c08",
+  "theme_color": "#0e0c08",
+  "categories": ["games", "strategy", "entertainment"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "New game", "url": "/Games/New", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Live games", "url": "/Games?scope=live", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

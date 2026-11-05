@@ -14,8 +14,11 @@ using Microsoft.Extensions.Options;
 
 namespace GeoConquest.Controllers;
 
-/// <summary>Sign-up, login, logout, POPIA consent, password reset and "your data". All rules live in <see cref="IAccountService"/>.</summary>
-[AllowAnonymous]
+/// <summary>
+/// Sign-up, login, logout, POPIA consent, password reset and "your data". All rules live in <see cref="IAccountService"/>.
+/// No class-level [AllowAnonymous]: it would override the [Authorize] on the signed-in-only actions below.
+/// Pages without an attribute are open to everyone (the app has no fallback policy).
+/// </summary>
 public sealed class AccountController : Controller
 {
     private const string ServiceDownMessage =
@@ -311,7 +314,91 @@ public sealed class AccountController : Controller
         }
     }
 
+    // ───────────────────────────── Account security (change password / email) ─────────────────────────────
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> Security(CancellationToken cancellationToken)
+    {
+        var model = await BuildSecurityAsync(cancellationToken);
+        return model is null ? NotFound() : View(model);
+    }
+
+    [HttpPost]
+    [Authorize]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    public async Task<IActionResult> ChangePassword([Bind(Prefix = "Password")] ChangePasswordViewModel input, CancellationToken cancellationToken)
+    {
+        ClearOtherForm("EmailChange");
+        if (!ModelState.IsValid)
+            return await RedisplaySecurityAsync(cancellationToken);
+
+        try
+        {
+            var account = await _accounts.ChangePasswordAsync(CurrentUserId!, input.CurrentPassword, input.NewPassword, cancellationToken);
+            // The security stamp changed, so this browser gets a fresh sign-in cookie; other devices are signed out.
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, _accounts.CreatePrincipal(account));
+            TempData["Success"] = "Password changed. Your other devices have been signed out.";
+            return RedirectToAction(nameof(Security));
+        }
+        catch (DomainException ex)
+        {
+            ModelState.AddModelError("Password", ex.Message);
+            return await RedisplaySecurityAsync(cancellationToken);
+        }
+    }
+
+    [HttpPost]
+    [Authorize]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    public async Task<IActionResult> ChangeEmail([Bind(Prefix = "EmailChange")] ChangeEmailViewModel input, CancellationToken cancellationToken)
+    {
+        ClearOtherForm("Password");
+        if (!ModelState.IsValid)
+            return await RedisplaySecurityAsync(cancellationToken, input.NewEmail);
+
+        try
+        {
+            await _accounts.ChangeEmailAsync(CurrentUserId!, input.CurrentPassword, input.NewEmail, cancellationToken);
+            TempData["Success"] = "Email changed. Reset links and notices now go to the new address.";
+            return RedirectToAction(nameof(Security));
+        }
+        catch (Exception ex) when (ex is DomainException or DuplicateAccountException)
+        {
+            ModelState.AddModelError("EmailChange", ex is DuplicateAccountException ? "That email is already used by another account." : ex.Message);
+            return await RedisplaySecurityAsync(cancellationToken, input.NewEmail);
+        }
+    }
+
     // ───────────────────────────── helpers ─────────────────────────────
+
+    /// <summary>Each form posts alone, so errors from the other (empty) form are dropped.</summary>
+    private void ClearOtherForm(string prefix)
+    {
+        foreach (var key in ModelState.Keys.Where(k => k.StartsWith(prefix + ".", StringComparison.Ordinal)).ToList())
+            ModelState.Remove(key);
+    }
+
+    private async Task<SecurityViewModel?> BuildSecurityAsync(CancellationToken ct)
+    {
+        var account = await _accounts.GetAsync(CurrentUserId!, ct);
+        return account is null ? null : new SecurityViewModel
+        {
+            Username = account.Username,
+            Email = account.Email,
+            PasswordChangedAtUtc = account.PasswordChangedAtUtc
+        };
+    }
+
+    private async Task<IActionResult> RedisplaySecurityAsync(CancellationToken ct, string? newEmail = null)
+    {
+        var model = await BuildSecurityAsync(ct);
+        if (model is null)
+            return NotFound();
+        if (newEmail is not null)
+            model.EmailChange.NewEmail = newEmail;     // passwords are never sent back to the page
+        return View(nameof(Security), model);
+    }
 
     private Func<string, string, string> ResetLinkBuilder() => (uid, token) =>
         PublicLinks.Build(Request, _email, _env, Url.Action(nameof(ResetPassword), "Account", new { uid, token })!)

@@ -1,0 +1,88 @@
+@{
+    ViewData["Title"] = "Get the app";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Get the app · play on your phone</h1>
+        <div class="cr-sub cr-upper">Free · no app store · always the latest version</div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="cr-panel cr-glow h-100">
+            <div class="cr-label"><span>Install GeoConquest</span></div>
+
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <img src="~/icons/icon-192.png" alt="" width="72" height="72" class="cr-app-icon" />
+                <div>
+                    <div class="cr-readout" style="font-size:1.2rem">GeoConquest</div>
+                    <div class="small cr-muted">Opens full screen from your home screen, like any other app. Sound and vibration work, and your account and games are the same as on the website.</div>
+                </div>
+            </div>
+
+            @* Exactly one of these blocks is shown, depending on the device (site.js). *@
+            <div data-install-state="installed" hidden>
+                <div class="cr-consent"><strong class="cr-green">✔ You're using the app.</strong> Nothing more to do, Commander.</div>
+            </div>
+
+            <div data-install-state="done" hidden>
+                <div class="cr-consent"><strong class="cr-green">✔ Installed.</strong> Find GeoConquest on your home screen or in your apps list.</div>
+            </div>
+
+            <div data-install-state="ready" hidden>
+                <button type="button" class="cr-btn green lg w-100" data-install>📲 Install GeoConquest</button>
+                <p class="small cr-muted mt-2 mb-0">Your browser asks you to confirm, then adds the icon to your home screen or apps.</p>
+            </div>
+
+            <div data-install-state="ios" hidden>
+                <div class="cr-label mb-2"><span>iPhone or iPad (Safari)</span></div>
+                <ol class="cr-steps">
+                    <li>Open this page in <strong>Safari</strong>.</li>
+                    <li>Tap the <strong>Share</strong> button <span class="cr-key">⬆︎</span> at the bottom (or top on iPad).</li>
+                    <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+                    <li>Tap <strong>Add</strong>. GeoConquest appears on your home screen.</li>
+                </ol>
+            </div>
+
+            <div data-install-state="manual">
+                <div class="cr-label mb-2"><span>Android (Chrome or Samsung Internet)</span></div>
+                <ol class="cr-steps">
+                    <li>Open this site in <strong>Chrome</strong> on your phone.</li>
+                    <li>Tap the <strong>⋮</strong> menu at the top right.</li>
+                    <li>Tap <strong>Add to Home screen</strong> or <strong>Install app</strong>, then <strong>Install</strong>.</li>
+                </ol>
+                <div class="cr-label mb-2 mt-3"><span>iPhone or iPad</span></div>
+                <ol class="cr-steps">
+                    <li>Open this site in <strong>Safari</strong>, tap <strong>Share</strong> <span class="cr-key">⬆︎</span>, then <strong>Add to Home Screen</strong>.</li>
+                </ol>
+                <div class="cr-label mb-2 mt-3"><span>Computer (Chrome or Edge)</span></div>
+                <ol class="cr-steps mb-0">
+                    <li>Click the install icon <span class="cr-key">⊕</span> at the right end of the address bar, then <strong>Install</strong>.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="cr-panel h-100 text-center">
+            <div class="cr-label"><span>On a computer? Scan with your phone</span></div>
+            <div class="cr-qr mx-auto my-3">
+                <img src="~/img/app-qr.svg" alt="QR code linking to the GeoConquest website" width="220" height="220" />
+            </div>
+            <p class="small cr-muted mb-1">Point your phone's camera at the code, open the link, then follow the steps for your phone.</p>
+            <p class="small mb-0"><a href="https://geoconquest-066c.onrender.com/">geoconquest-066c.onrender.com</a></p>
+        </div>
+    </div>
+</div>
+
+<div class="cr-panel mt-3">
+    <div class="cr-label"><span>Good to know</span></div>
+    <ul class="small mb-0 ps-3" style="line-height:1.8">
+        <li>The app needs the internet: every roll and move is checked by the server, so nobody can cheat. Without a signal you'll see an offline screen, and your game waits for you.</li>
+        <li>It updates itself. There's nothing to download again when the game changes.</li>
+        <li>Vibration on wins and losses works on Android. iPhones don't let websites or web apps vibrate.</li>
+        <li>To remove it, delete the icon like any other app. Your account stays.</li>
+    </ul>
+</div>

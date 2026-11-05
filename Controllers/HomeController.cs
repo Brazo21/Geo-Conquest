@@ -40,6 +40,10 @@ public class HomeController : Controller
     [AllowWithoutConsent]
     public IActionResult Settings() => View();
 
+    /// <summary>Install GeoConquest on a phone or computer as an app (PWA).</summary>
+    [AllowWithoutConsent]
+    public IActionResult App() => View();
+
     /// <summary>Unexpected server errors. The details are logged; the player sees a simple message.</summary>
     [AllowWithoutConsent]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

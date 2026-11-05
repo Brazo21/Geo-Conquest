@@ -1,0 +1,68 @@
+@model SecurityViewModel
+@{
+    ViewData["Title"] = "Account security";
+    string Date(DateTime? d) => d is null ? "never" : d.Value.ToLocalTime().ToString("d MMM yyyy, HH:mm");
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="cr-title">Account security</h1>
+        <div class="cr-sub cr-upper">@@@Model.Username · password last changed @Date(Model.PasswordChangedAtUtc)</div>
+    </div>
+    <a asp-action="MyData" class="cr-btn">Your data</a>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Change password</span></div>
+            <form asp-action="ChangePassword" method="post" novalidate>
+                <div asp-validation-summary="None" class="mb-2"></div>
+                <span asp-validation-for="Password" class="small d-block mb-2"></span>
+                <div class="mb-3">
+                    <label asp-for="Password.CurrentPassword" class="form-label"></label>
+                    <input asp-for="Password.CurrentPassword" class="form-control" autocomplete="current-password" maxlength="100" />
+                    <span asp-validation-for="Password.CurrentPassword" class="small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Password.NewPassword" class="form-label"></label>
+                    <input asp-for="Password.NewPassword" class="form-control" autocomplete="new-password" placeholder="8+ characters, a letter and a number" maxlength="100" />
+                    <span asp-validation-for="Password.NewPassword" class="small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Password.ConfirmPassword" class="form-label"></label>
+                    <input asp-for="Password.ConfirmPassword" class="form-control" autocomplete="new-password" maxlength="100" />
+                    <span asp-validation-for="Password.ConfirmPassword" class="small"></span>
+                </div>
+                <button type="submit" class="cr-btn green w-100">Change password</button>
+                <p class="small cr-muted mt-2 mb-0">Your other devices are signed out, and a notice goes to your email.</p>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="cr-panel h-100">
+            <div class="cr-label"><span>Change email</span></div>
+            <p class="small mb-3">Current email: <strong class="cr-amber">@Model.Email</strong></p>
+            <form asp-action="ChangeEmail" method="post" novalidate>
+                <span asp-validation-for="EmailChange" class="small d-block mb-2"></span>
+                <div class="mb-3">
+                    <label asp-for="EmailChange.NewEmail" class="form-label"></label>
+                    <input asp-for="EmailChange.NewEmail" class="form-control" autocomplete="email" placeholder="you@example.com" maxlength="254" />
+                    <span asp-validation-for="EmailChange.NewEmail" class="small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="EmailChange.CurrentPassword" class="form-label"></label>
+                    <input asp-for="EmailChange.CurrentPassword" class="form-control" autocomplete="current-password" maxlength="100" />
+                    <span asp-validation-for="EmailChange.CurrentPassword" class="small"></span>
+                </div>
+                <button type="submit" class="cr-btn green w-100">Change email</button>
+                <p class="small cr-muted mt-2 mb-0">Password-reset links go to this address. Your old address gets a notice of the change.</p>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

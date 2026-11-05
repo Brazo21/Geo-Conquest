@@ -183,6 +183,26 @@ public sealed class UserAccount
         SecurityStamp = NewStamp();
     }
 
+    // ── Self-service changes (Account security page) ───────────────────────
+
+    /// <summary>The user chose a new password while signed in. Ends their other sessions.</summary>
+    public void ChangePassword(string newPasswordHash) => CompletePasswordReset(newPasswordHash);
+
+    /// <summary>Changes the email used for login and reset links. Uniqueness is checked by the service and the unique index.</summary>
+    public void ChangeEmail(string email)
+    {
+        email = (email ?? string.Empty).Trim();
+        if (email.Length > 254 || !EmailPattern.IsMatch(email))
+            throw new DomainException("Please enter a valid email address.");
+        if (Normalize(email) == NormalizedEmail)
+            throw new DomainException("That is already your email address.");
+
+        Email = email;
+        NormalizedEmail = Normalize(email);
+        PasswordResetTokenHash = null;        // an old reset link must not outlive the address it was sent to
+        PasswordResetExpiresUtc = null;
+    }
+
     // ── Admin control ───────────────────────────────────────────────────────
 
     public void Suspend(string reason, string byUsername)

@@ -42,6 +42,14 @@ public interface IAccountService
     /// <summary>Sets a new password from a reset link. Throws <see cref="DomainException"/> if the link is invalid or used.</summary>
     Task ResetPasswordAsync(string userId, string token, string newPassword, CancellationToken cancellationToken = default);
 
+    /// <summary>Changes the password after checking the current one. Signs out other devices; returns the updated account.</summary>
+    Task<UserAccount> ChangePasswordAsync(string userId, string currentPassword, string newPassword,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Changes the email after checking the password. The old address is told about the change.</summary>
+    Task<UserAccount> ChangeEmailAsync(string userId, string currentPassword, string newEmail,
+        CancellationToken cancellationToken = default);
+
     /// <summary>POPIA right to erasure: deletes the account and every game it owns after checking the password.</summary>
     Task DeleteOwnAccountAsync(string userId, string password, CancellationToken cancellationToken = default);
 }
@@ -238,6 +246,59 @@ public sealed class AccountService : IAccountService
             $"Hello Commander {account.DisplayName},\n\nThe password for \"{account.Username}\" was just changed and every " +
             "device was signed out. If this wasn't you, reset it again straight away and tell the site administrator.\n\nGeoConquest Command"));
         _logger.LogInformation("Password reset completed for {Username}", account.Username);
+    }
+
+    public async Task<UserAccount> ChangePasswordAsync(string userId, string currentPassword, string newPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await LoadAndVerifyAsync(userId, currentPassword, cancellationToken);
+        ValidatePasswordStrength(newPassword);
+        if (_hasher.VerifyHashedPassword(account, account.PasswordHash, newPassword) != PasswordVerificationResult.Failed)
+            throw new DomainException("Choose a password different from your current one.");
+
+        account.ChangePassword(_hasher.HashPassword(account, newPassword));
+        await _users.UpdateAsync(account, cancellationToken);
+        _sessions.Invalidate(account.Id);
+
+        _email.Enqueue(new EmailMessage(account.Email, "GeoConquest · your password was changed",
+            $"Hello Commander {account.DisplayName},\n\nThe password for \"{account.Username}\" was just changed from the " +
+            "Account security page, and your other devices were signed out. If this wasn't you, use \"Forgot password\" " +
+            "straight away and tell the site administrator.\n\nGeoConquest Command"));
+        _logger.LogInformation("Password changed by {Username}", account.Username);
+        return account;
+    }
+
+    public async Task<UserAccount> ChangeEmailAsync(string userId, string currentPassword, string newEmail,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await LoadAndVerifyAsync(userId, currentPassword, cancellationToken);
+        string oldEmail = account.Email;
+
+        account.ChangeEmail(newEmail);
+        var other = await _users.FindByLoginAsync(account.Email, cancellationToken);
+        if (other is not null && other.Id != account.Id)
+            throw new DomainException("That email is already used by another account.");
+
+        await _users.UpdateAsync(account, cancellationToken);
+
+        // Tell the old address, so a hijacker can't quietly take over the account's recovery email.
+        _email.Enqueue(new EmailMessage(oldEmail, "GeoConquest · your email was changed",
+            $"Hello Commander {account.DisplayName},\n\nThe email for \"{account.Username}\" was changed from this address " +
+            "to a new one. If this wasn't you, contact the site administrator straight away.\n\nGeoConquest Command"));
+        _logger.LogInformation("Email changed by {Username}", account.Username);
+        return account;
+    }
+
+    private async Task<UserAccount> LoadAndVerifyAsync(string userId, string currentPassword, CancellationToken ct)
+    {
+        var account = await _users.GetByIdAsync(userId, ct) ?? throw new DomainException("Account not found.");
+        if (string.IsNullOrEmpty(currentPassword) ||
+            _hasher.VerifyHashedPassword(account, account.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
+        {
+            _logger.LogWarning("Wrong current password on the security page for {Username}", account.Username);
+            throw new DomainException("Your current password is not correct.");
+        }
+        return account;
     }
 
     public async Task DeleteOwnAccountAsync(string userId, string password, CancellationToken cancellationToken = default)
